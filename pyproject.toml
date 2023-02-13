@@ -1,0 +1,21 @@
+[build-system]
+    requires = ["setuptools>=61.0"]
+    build-backend = "setuptools.build_meta"
+
+[project]
+    name = "pytts_tool"
+    version = "0.0.1"
+    description = "Tabletop Simulator Tools in Python"
+    readme = "README.md"
+    requires-python = ">=3.8"
+    dependencies = [
+        "click",
+        "arrow",
+        "attrs",
+        "requests",
+        "tomli",
+        "tomli-w",
+        "tqdm",
+    ]
+    [project.scripts]
+    pytts_tool = "pytts_tool:pytts_tool"

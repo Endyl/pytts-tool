@@ -1,0 +1,12 @@
+LICENSE
+pyproject.toml
+src/pytts_tool/__init__.py
+src/pytts_tool.egg-info/PKG-INFO
+src/pytts_tool.egg-info/SOURCES.txt
+src/pytts_tool.egg-info/dependency_links.txt
+src/pytts_tool.egg-info/entry_points.txt
+src/pytts_tool.egg-info/requires.txt
+src/pytts_tool.egg-info/top_level.txt
+src/pytts_tool/tts/_data.py
+src/pytts_tool/tts/data.py
+src/pytts_tool/tts/example/szuv.py
