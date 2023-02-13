@@ -1,16 +1,19 @@
 import json
 
 import click
+import tomli
 
 from .tts.data import TTSSave
 
-WIN_TTS = '/media/slemmer/ACCC6108CC60CE60/Documents and Settings/Endyl/Dokumentumok/My Games/Tabletop Simulator'
-WIN_WORKSHOP = f'{WIN_TTS}/Mods/Workshop'
-WIN_SAVES = f'{WIN_TTS}/Saves'
+def read_conf():
+    with open('pytts.toml', 'rb') as f:
+        conf = tomli.load(f)
+        for path_key, path in conf['PATHS'].items():
+            conf['PATHS'][path_key] = str(path).format(**conf['PATHS_BASE'])
+        return conf
 
-LNX_TTS = '/home/slemmer/.local/share/Tabletop Simulator'
-LNX_WORKSHOP = f'{LNX_TTS}/Mods/Workshop'
-LNX_SAVES = f'{LNX_TTS}/Saves'
+def format_path(conf, path):
+    return path.format(**conf['PATHS_BASE'], **conf['PATHS'])
 
 def extract_save(path_to_save, path_to_project, do_backup=False):
     tts_save = TTSSave.from_save(path_to_save, do_backup=do_backup)
@@ -22,7 +25,15 @@ def pytts_tool():
     pass
 
 @pytts_tool.command('extract')
+@click.option('-s', '--save', default=None)
+@click.option('-o', '--output', default=None)
 @click.option('-b', '--backup', 'do_backup', is_flag=True, default=False)
-def pytts_extract(do_backup):
-    extract_save(f'{WIN_SAVES}/MMGA/Modded/TFMARS_vVERSION.json', './out/mmga', do_backup)
+def pytts_extract(save, output, do_backup):
+    conf = read_conf()
+    conf_save = format_path(conf, conf.get('EXTRACT_SAVE', ''))
+    conf_out = format_path(conf, conf.get('EXTRACT_OUT', ''))
+
+    save = save or conf_save
+    output = output or conf_out
+    extract_save(save, output, do_backup)
 
