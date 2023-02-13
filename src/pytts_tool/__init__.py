@@ -5,8 +5,8 @@ import tomli
 
 from .tts.data import TTSSave
 
-def read_conf():
-    with open('pytts.toml', 'rb') as f:
+def read_conf(config_path):
+    with open(config_path, 'rb') as f:
         conf = tomli.load(f)
         for path_key, path in conf['PATHS'].items():
             conf['PATHS'][path_key] = str(path).format(**conf['PATHS_BASE'])
@@ -27,9 +27,10 @@ def pytts_tool():
 @pytts_tool.command('extract')
 @click.option('-s', '--save', default=None)
 @click.option('-o', '--output', default=None)
+@click.option('-c', '--config', default='pytts.toml')
 @click.option('-b', '--backup', 'do_backup', is_flag=True, default=False)
-def pytts_extract(save, output, do_backup):
-    conf = read_conf()
+def pytts_extract(save, output, config, do_backup):
+    conf = read_conf(config)
     conf_save = format_path(conf, conf.get('EXTRACT_SAVE', ''))
     conf_out = format_path(conf, conf.get('EXTRACT_OUT', ''))
 
