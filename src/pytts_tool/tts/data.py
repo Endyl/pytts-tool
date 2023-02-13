@@ -1,8 +1,10 @@
+from collections import namedtuple
 import json
 import mimetypes
 import os, os.path
 from urllib.parse import urlparse
 import time
+from typing import Any, Union, ClassVar, Final
 
 import requests
 import tomli, tomli_w
@@ -129,11 +131,12 @@ class ResourceRequest:
     RES_LIST = {}
 
     @classmethod
-    def create(cls, files, get_path, url, ext=None, guess_ext=None):
+    def create(cls, files: 'FileExports', get_path, url, ext=None, guess_ext=None) -> 'ResourceRequest':
         if url not in cls.RES_LIST:
             cls.RES_LIST[url] = cls(url, ext, guess_ext)
         res = cls.RES_LIST[url]
-        files[get_path(res)] = res
+        files.add(get_path(res), res)
+        return res
 
     def __init__(self, url, ext=None, guess_ext=None):
         self.url = url
@@ -168,6 +171,78 @@ class ResourceRequest:
                     if (chunk_encoded and chunk) or not chunk_encoded:
                         f.write(chunk)
 
+ExportPathInfo = namedtuple('ExportPathInfo', ('path', 'full', 'dir', 'name', 'ext'))
+class FileExports:
+    def __init__(self, base_path):
+        self.files = {}
+        self.base_path = base_path
+
+    def add(self, path, content):
+        self.files[path] = content
+
+    def add_to(self, path, key, value):
+        if not path in self.files:
+            print(f'Adding to missing dict file: {path}')
+            self.add(path, {})
+        if key in self.files[path]:
+            print(f'Multiple assignment [{path}: {key}]')
+        self.files[path][key] = value
+
+
+    def add_to2(self, path, key, key2, value):
+        if not path in self.files:
+            print(f'Adding to missing dict file: {path}')
+            self.add(path, {})
+        if not key in self.files[path]:
+            print(f'Adding to missing dict key [{path}: {key}.{key2}]')
+        if key2 in self.files[path][key]:
+            print(f'Multiple assignment [{path}: {key}.{key2}]')
+        self.files[path][key][key2] = value
+
+    def append_to(self, path, key, value):
+        if not path in self.files:
+            print(f'Appending to key in missing file [{path}: {key}]')
+            self.add(path, {})
+        if not key in self.files[path]:
+            print(f'Appending to missing key in file [{path}: {key}]')
+            self.files[path][key] = []
+        self.files[path][key].append(value)
+
+    def get_path_info(self, fpath) -> ExportPathInfo:
+        full_path = os.path.join(self.base_path, fpath)
+        path_parts = os.path.split(full_path)
+        return ExportPathInfo(
+            fpath,
+            full_path,
+            path_parts[0],
+            *os.path.splitext(path_parts[1])
+        )
+
+    def export_file(self, pinfo: ExportPathInfo, content):
+        with open(pinfo.full, 'w') as f:
+            if '.json' == pinfo.ext:
+                json.dump(content, f, ensure_ascii=False, indent='\t')
+            else:
+                f.write(str(content))
+
+    def export_resource(self, pinfo: ExportPathInfo, res: ResourceRequest):
+        if os.path.isfile(pinfo.full):
+            return
+        res.download(pinfo.full)
+
+    def export_all(self):
+        pbar = tqdm(self.files.items())
+        for fpath, fcontent in pbar:
+            pinfo = self.get_path_info(fpath)
+            pbar.set_description(f'Exporting: {pinfo.full}')
+            os.makedirs(pinfo.dir, exist_ok=True)
+
+            if isinstance(fcontent, ResourceRequest):
+                self.export_resource(pinfo, fcontent)
+            else:
+                self.export_file(pinfo, fcontent)
+
+
 
 
 class TTSBase:
@@ -186,8 +261,31 @@ class TTSBase:
     FILE_LUA_STATE_RAW = 'state.txt'
     FILE_XML = 'main.xml'
 
-    def __init__(self, data: dict, *args, **kwargs):
+    def __init__(
+            self,
+            data: dict,
+            root: Union['TTSSave', None]=None,
+            parent: Union['TTSSave', 'TTSSaveObject', None]=None,
+            base_path: str='',
+            *args,
+            do_backup=False,
+            **kwargs):
         self.data = data
+        self.root = root
+        self.parent = parent
+        self.base_path = base_path
+        self.do_backup = root.do_backup if root else do_backup
+        self.files: Union[FileExports, None] = None
+
+    def get_path(self, *path):
+        return os.path.join(self.base_path, *path)
+
+    def get_ext_path(self, key):
+        return self.get_path(self.FILE_EXTERNAL, f'{key}.json')
+
+    def get_backup_path(self, key, res: ResourceRequest, is_root=False):
+        root_path = os.path.join(self.FILE_BACKUP, f'{key}{res.get_ext()}')
+        return root_path if is_root else self.get_path(root_path)
 
     def iterate_data(self):
         for key in self.KEYS_ALL:
@@ -250,83 +348,72 @@ class TTSSave(TTSBase):
     @classmethod
     def from_save(cls, path, *args, **kwargs) -> 'TTSSave':
         with open(path, 'r') as savefile:
-            return TTSSave(json.load(savefile), *args, **kwargs)
+            return TTSSave(json.load(savefile), None, None, '', *args, **kwargs)
 
-    def __init__(self, data, *args, do_backup=False, **kwargs):
-        super().__init__(data, *args, **kwargs)
-        self.do_backup = do_backup
-
-    def export_as_project(self, path):
-        export_files = {
-            self.FILE_MAIN: {},
-        }
+    def export_as_project(self, export_path):
+        self.files = FileExports(export_path)
+        self.files.add(self.FILE_MAIN, {})
 
         # Export fields
         for c_key, c_value in self.iterate_data():
             if c_key not in self.KEYS_ALL:
                 print(f'Unknown key: {c_key}')
-            self.export(c_key, c_value, export_files)
+            self.export(c_key, c_value, self.files)
 
         # Write exported files
-        file_progress = tqdm(export_files.items())
-        for fpath, fcontent in file_progress:
-            full_path = os.path.join(path, fpath)
-            file_progress.set_description(f'Export: {full_path}')
-            path_parts = os.path.split(full_path)
-            os.makedirs(path_parts[0], exist_ok=True)
-            fname = os.path.splitext(path_parts[1])
-
-            if isinstance(fcontent, ResourceRequest):
-                if not os.path.isfile(full_path):
-                    fcontent.download(full_path)
-            else:
-                with open(full_path, 'w') as f:
-                    if '.json' == fname[1]:
-                        json.dump(fcontent, f, ensure_ascii=False, indent='\t')
-                    else:
-                        f.write(str(fcontent))
+        self.files.export_all()
 
     # ------------------------------------------------------ Field Exporters ###
-    def export(self, key, value, files):
+    def export(self, key, value, files: FileExports):
         exporter = getattr(self, f'export__{key}', self.export_raw)
         return exporter(key, value, files)
 
-    def export_raw(self, key, value, files):
+    def export_raw(self, key, value, files: FileExports):
         if key in self.KEYS_AS_EXTERNAL:
-            files[f'{self.FILE_EXTERNAL}/{key}.json'] = value
+            files.add(self.get_ext_path(key), value)
         else:
             if self.do_backup and is_url(value):
-                resource = ResourceRequest(value, guess_ext=KEY_TO_EXT.get(key, None))
-                files[f'{self.FILE_BACKUP}/{key}{resource.get_ext()}'] = resource
-            files[self.FILE_MAIN][key] = value
+                ResourceRequest.create(
+                    files, lambda res: self.get_backup_path(key, res, True),
+                    value, guess_ext=KEY_TO_EXT.get(key, None)
+                )
+            files.add_to(self.get_path(self.FILE_MAIN), key, value)
 
     def export__DecalPallet(self, key, value, files):
         if self.do_backup and value:
             for i, decal in enumerate(value):
                 decal_url = decal.get(KEY_IMAGE_URL, None)
                 if decal_url and is_url(decal_url):
-                    resource = ResourceRequest(decal_url, guess_ext='.png')
-                    files[f'{self.FILE_BACKUP}/{key}-{i}{resource.get_ext()}'] = resource
+                    ResourceRequest.create(
+                        files, lambda res: self.get_backup_path(f'{key}/{i}', res, True),
+                        decal_url, guess_ext=KEY_TO_EXT.get(key, None)
+                    )
         self.export_raw(key, value, files)
 
-    def export__LuaScript(self, key, value, files):
-        files[self.FILE_LUA] = value
-
-    def export__XmlUI(self, key, value, files):
-        files[self.FILE_XML] = value
-
-    def export__LuaScriptState(self, key, value, files):
-        if type(value) is str:
-            files[self.FILE_LUA_STATE_RAW] = value
+    def export__LuaScript(self, key, value, files: FileExports):
+        if value and str(value).strip():
+            files.add(self.get_path(self.FILE_LUA), value)
         else:
-            files[self.FILE_LUA_STATE] = json_dumps(value)
+            self.export_raw(key, value, files)
 
-    def export__ObjectStates(self, key, value, files):
-        files[self.FILE_MAIN][key] = []
+    def export__XmlUI(self, key, value, files: FileExports):
+        if value and str(value).strip():
+            files.add(self.get_path(self.FILE_XML), value)
+        else:
+            self.export_raw(key, value, files)
+
+    def export__LuaScriptState(self, key, value, files: FileExports):
+        if type(value) is str:
+            files.add(self.get_path(self.FILE_LUA_STATE_RAW), value)
+        else:
+            files.add(self.get_path(self.FILE_LUA_STATE), json_dumps(value))
+
+    def export__ObjectStates(self, key, value, files: FileExports):
+        files.add_to(self.get_path(self.FILE_MAIN), key, [])
         for obj_data in value:
-            save_obj = TTSSaveObject(obj_data, self, self.FILE_OBJECTS)
+            save_obj = TTSSaveObject(obj_data, self, self, self.FILE_OBJECTS)
             save_obj.export_as_project(files)
-            files[self.FILE_MAIN][key].append(save_obj.folder_name)
+            files.append_to(self.get_path(self.FILE_MAIN), key, save_obj.folder_name)
 
 
 
@@ -388,12 +475,18 @@ class TTSSaveObject(TTSBase):
 
     KEYS_AS_EXTERNAL = ()
 
-    def __init__(self, data, save: TTSSave, path, *args, **kwargs):
-        super().__init__(data, *args, **kwargs)
-        self.save = save
-        self.data = data
-        self.path = f'{path}/{self.folder_name}'
-        self.do_backup = save.do_backup
+
+    def __init__(
+            self,
+            data: dict,
+            root: Union['TTSSave', None]=None,
+            parent: Union['TTSSave', 'TTSSaveObject', None]=None,
+            base_path: str='',
+            *args,
+            do_backup=False,
+            **kwargs):
+        super().__init__(data, root, parent, base_path, *args, do_backup=do_backup, **kwargs)
+        self.base_path = f'{base_path}/{self.folder_name}'
 
     @property
     def guid(self):
@@ -407,54 +500,44 @@ class TTSSaveObject(TTSBase):
     def folder_name(self):
         return f'{self.name}.{self.guid}'
 
-    def export_as_project(self, files):
-        files[self.get_path(self.FILE_MAIN)] = {}
+    def export_as_project(self, files: FileExports):
+        files.add(self.get_path(self.FILE_MAIN), {})
         for c_key, c_value in self.iterate_data():
             if c_key not in self.KEYS_ALL:
                 print(f'Unknown key: {c_key}')
             self.export(c_key, c_value, files)
 
     # ------------------------------------------------------ Field Exporters ###
-    def get_path(self, path):
-        return f'{self.path}/{path}'
-
-    def get_ext_path(self, key):
-        return self.get_path(f'{self.FILE_EXTERNAL}/{key}.json')
-
-    def get_backup_path(self, key, res: ResourceRequest, is_root=False):
-        root_path = f'{self.FILE_BACKUP}/{key}{res.get_ext()}'
-        return root_path if is_root else self.get_path(root_path)
-
-
-
-    def export(self, key, value, files):
+    def export(self, key, value, files: FileExports):
         exporter = getattr(self, f'export__{key}', self.export_raw)
         return exporter(key, value, files)
 
-    def export_raw(self, key, value, files):
+    def export_raw(self, key, value, files: FileExports):
         if key in self.KEYS_AS_EXTERNAL:
-            files[self.get_ext_path(key)] = value
+            files.add(self.get_ext_path(key), value)
         else:
             if self.do_backup and is_url(value):
-                resource = ResourceRequest(value, guess_ext=KEY_TO_EXT.get(key, None))
-                files[self.get_backup_path(key, resource)] = resource
-            files[self.get_path(self.FILE_MAIN)][key] = value
+                ResourceRequest.create(
+                    files, lambda res: self.get_backup_path(key, res, False),
+                    value, guess_ext=KEY_TO_EXT.get(key, None)
+                )
+            files.add_to(self.get_path(self.FILE_MAIN), key, value)
 
-    def export__States(self, key, value, files):
-        files[self.get_path(self.FILE_MAIN)][key] = {}
+    def export__States(self, key, value, files: FileExports):
+        files.add_to(self.get_path(self.FILE_MAIN), key, {})
         for state_key, state_data in value.items():
-            save_obj = TTSSaveObject(state_data, self.save, self.get_path(self.FILE_STATES))
+            save_obj = TTSSaveObject(state_data, self.root, self, self.get_path(self.FILE_STATES))
             save_obj.export_as_project(files)
-            files[self.get_path(self.FILE_MAIN)][key][state_key] = save_obj.folder_name
+            files.add_to2(self.get_path(self.FILE_MAIN), key, state_key, save_obj.folder_name)
 
-    def export__ContainedObjects(self, key, value, files):
-        files[self.get_path(self.FILE_MAIN)][key] = []
+    def export__ContainedObjects(self, key, value, files: FileExports):
+        files.add_to(self.get_path(self.FILE_MAIN), key, [])
         for obj_data in value:
-            save_obj = TTSSaveObject(obj_data, self.save, self.get_path(self.FILE_OBJECTS))
+            save_obj = TTSSaveObject(obj_data, self.root, self, self.get_path(self.FILE_OBJECTS))
             save_obj.export_as_project(files)
-            files[self.get_path(self.FILE_MAIN)][key].append(save_obj.folder_name)
+            files.append_to(self.get_path(self.FILE_MAIN), key, save_obj.folder_name)
 
-    def export__CustomDeck(self, key, value, files):
+    def export__CustomDeck(self, key, value, files: FileExports):
         self.export_raw(key, value, files)
         if not value:
             return
@@ -462,8 +545,8 @@ class TTSSaveObject(TTSBase):
             if not (self.do_backup and deck):
                 continue
             assets = (
-                (deck.get(KEY_FACE_URL, None), f'{key}-{deckId}-{KEY_FACE_URL}'),
-                (deck.get(KEY_BACK_URL, None), f'{key}-{deckId}-{KEY_BACK_URL}'),
+                (deck.get(KEY_FACE_URL, None), f'{key}/{deckId}-{KEY_FACE_URL}'),
+                (deck.get(KEY_BACK_URL, None), f'{key}/{deckId}-{KEY_BACK_URL}'),
             )
             for asset in assets:
                 if not is_url(asset[0]):
@@ -472,7 +555,5 @@ class TTSSaveObject(TTSBase):
                     files, lambda res: self.get_backup_path(asset[1], res, True),
                     asset[0], guess_ext=KEY_TO_EXT.get(key, None)
                 )
-                #resource = ResourceRequest(asset[0], guess_ext=KEY_TO_EXT.get(key, None))
-                #files[self.get_backup_path(asset[1], resource, True)] = resource
 
 
