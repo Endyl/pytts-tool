@@ -1,7 +1,0 @@
-click
-arrow
-attrs
-requests
-tomli
-tomli-w
-tqdm

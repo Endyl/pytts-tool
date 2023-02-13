@@ -1,2 +1,0 @@
-[console_scripts]
-pytts_tool = pytts_tool:pytts_tool

@@ -1,7 +1,0 @@
-Metadata-Version: 2.1
-Name: pytts-tool
-Version: 0.0.1
-Summary: Tabletop Simulator Tools in Python
-Requires-Python: >=3.8
-Description-Content-Type: text/markdown
-License-File: LICENSE
