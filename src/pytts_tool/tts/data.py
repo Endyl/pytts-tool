@@ -1,4 +1,4 @@
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 import json
 import mimetypes
 import os, os.path
@@ -103,11 +103,34 @@ KEY_IMAGE_URL = 'ImageURL'
 # CustomDeck
 KEY_FACE_URL = 'FaceURL'
 KEY_BACK_URL = 'BackURL'
+# CustomAssetbundle
+KEY_ASSETBUNDLE_URL = 'AssetbundleURL'
+KEY_ASSETBUNDLE_SECONDARY_URL = 'AssetbundleSecondaryURL'
+# CustomImage
+KEY_IMAGE_SECONDARY_URL = 'ImageSecondaryURL'
+# CustomMesh
+KEY_MESH_URL = 'MeshURL'
+KEY_DIFFUSE_URL = 'DiffuseURL'
+KEY_NORMAL_URL = 'NormalURL'
+KEY_COLLIDER_URL = 'ColliderURL'
+# CustomPDF
+KEY_PDF_URL = 'PDFUrl'
 #endregion: misc_keys
 
 KEY_TO_EXT = {
-    KEY_SKY_URL: '.jpg',
-    KEY_TABLE_URL: '.jpg',
+    KEY_SKY_URL: '.img-x',
+    KEY_TABLE_URL: '.img-x',
+    KEY_ASSETBUNDLE_URL: '.bin',
+    KEY_ASSETBUNDLE_SECONDARY_URL: '.bin',
+    KEY_MESH_URL: '.bin',
+    KEY_PDF_URL: '.pdf',
+    KEY_IMAGE_URL: '.img-x',
+    KEY_IMAGE_SECONDARY_URL: '.img-x',
+    KEY_DIFFUSE_URL: '.img-x',
+    KEY_NORMAL_URL: '.bin-x',
+    KEY_COLLIDER_URL: '.bin',
+    KEY_FACE_URL: '.img-x',
+    KEY_BACK_URL: '.img-x',
 }
 #endregion: keys
 
@@ -129,13 +152,16 @@ def is_url(value):
 class ResourceRequest:
     MIME_EXT = {} # ?
     RES_LIST = {}
+    GUID_MAP = defaultdict(list)
 
     @classmethod
-    def create(cls, files: 'FileExports', get_path, url, ext=None, guess_ext=None) -> 'ResourceRequest':
+    def create(cls, guid, files: 'FileExports', get_path, url, ext=None, guess_ext=None) -> 'ResourceRequest':
         if url not in cls.RES_LIST:
             cls.RES_LIST[url] = cls(url, ext, guess_ext)
         res = cls.RES_LIST[url]
-        files.add(get_path(res), res)
+        res_path = get_path(res)
+        files.add(res_path, res)
+        cls.GUID_MAP[url].append([guid, res_path])
         return res
 
     def __init__(self, url, ext=None, guess_ext=None):
@@ -359,6 +385,8 @@ class TTSSave(TTSBase):
             if c_key not in self.KEYS_ALL:
                 print(f'Unknown key: {c_key}')
             self.export(c_key, c_value, self.files)
+        if self.do_backup:
+            self.files.add(self.get_path(self.FILE_BACKUP, '__GUID_MAP__.json'), dict(ResourceRequest.GUID_MAP))
 
         # Write exported files
         self.files.export_all()
@@ -374,7 +402,7 @@ class TTSSave(TTSBase):
         else:
             if self.do_backup and is_url(value):
                 ResourceRequest.create(
-                    files, lambda res: self.get_backup_path(key, res, True),
+                    '_save_', files, lambda res: self.get_backup_path(key, res, True),
                     value, guess_ext=KEY_TO_EXT.get(key, None)
                 )
             files.add_to(self.get_path(self.FILE_MAIN), key, value)
@@ -385,7 +413,7 @@ class TTSSave(TTSBase):
                 decal_url = decal.get(KEY_IMAGE_URL, None)
                 if decal_url and is_url(decal_url):
                     ResourceRequest.create(
-                        files, lambda res: self.get_backup_path(f'{key}/{i}', res, True),
+                        '_save_', files, lambda res: self.get_backup_path(f'{key}/{i}', res, True),
                         decal_url, guess_ext=KEY_TO_EXT.get(key, None)
                     )
         self.export_raw(key, value, files)
@@ -403,6 +431,9 @@ class TTSSave(TTSBase):
             self.export_raw(key, value, files)
 
     def export__LuaScriptState(self, key, value, files: FileExports):
+        if not (value and str(value).strip()):
+            self.export_raw(key, value, files)
+            return
         if type(value) is str:
             files.add(self.get_path(self.FILE_LUA_STATE_RAW), value)
         else:
@@ -518,7 +549,7 @@ class TTSSaveObject(TTSBase):
         else:
             if self.do_backup and is_url(value):
                 ResourceRequest.create(
-                    files, lambda res: self.get_backup_path(key, res, False),
+                    self.guid, files, lambda res: self.get_backup_path(key, res, False),
                     value, guess_ext=KEY_TO_EXT.get(key, None)
                 )
             files.add_to(self.get_path(self.FILE_MAIN), key, value)
@@ -552,8 +583,93 @@ class TTSSaveObject(TTSBase):
                 if not is_url(asset[0]):
                     continue
                 ResourceRequest.create(
-                    files, lambda res: self.get_backup_path(asset[1], res, True),
+                    self.guid, files, lambda res: self.get_backup_path(asset[1], res, True),
                     asset[0], guess_ext=KEY_TO_EXT.get(key, None)
                 )
 
+    def export__CustomAssetbundle(self, key, value, files: FileExports):
+        self.export_raw(key, value, files)
+        if not (self.do_backup and value):
+            return
+        assets = (
+            (value.get(KEY_ASSETBUNDLE_URL, None), f'{key}/{KEY_ASSETBUNDLE_URL}'),
+            (value.get(KEY_ASSETBUNDLE_SECONDARY_URL, None), f'{key}/{KEY_ASSETBUNDLE_SECONDARY_URL}'),
+        )
+        for asset in assets:
+            if not is_url(asset[0]):
+                continue
+            ResourceRequest.create(
+                self.guid, files, lambda res: self.get_backup_path(asset[1], res, False),
+                asset[0], guess_ext=KEY_TO_EXT.get(key, None)
+            )
+
+    def export__CustomImage(self, key, value, files: FileExports):
+        self.export_raw(key, value, files)
+        if not (self.do_backup and value):
+            return
+        assets = (
+            (value.get(KEY_IMAGE_URL, None), f'{key}/{KEY_IMAGE_URL}'),
+            (value.get(KEY_IMAGE_SECONDARY_URL, None), f'{key}/{KEY_IMAGE_SECONDARY_URL}'),
+        )
+        for asset in assets:
+            if not is_url(asset[0]):
+                continue
+            ResourceRequest.create(
+                self.guid, files, lambda res: self.get_backup_path(asset[1], res, False),
+                asset[0], guess_ext=KEY_TO_EXT.get(key, None)
+            )
+
+    def export__CustomMesh(self, key, value, files: FileExports):
+        self.export_raw(key, value, files)
+        if not (self.do_backup and value):
+            return
+        assets = (
+            (value.get(KEY_MESH_URL, None), f'{key}/{KEY_MESH_URL}'),
+            (value.get(KEY_DIFFUSE_URL, None), f'{key}/{KEY_DIFFUSE_URL}'),
+            (value.get(KEY_NORMAL_URL, None), f'{key}/{KEY_NORMAL_URL}'),
+            (value.get(KEY_COLLIDER_URL, None), f'{key}/{KEY_COLLIDER_URL}'),
+        )
+        for asset in assets:
+            if not is_url(asset[0]):
+                continue
+            ResourceRequest.create(
+                self.guid, files, lambda res: self.get_backup_path(asset[1], res, False),
+                asset[0], guess_ext=KEY_TO_EXT.get(key, None)
+            )
+
+    def export__CustomPDF(self, key, value, files: FileExports):
+        self.export_raw(key, value, files)
+        if not (self.do_backup and value):
+            return
+        assets = (
+            (value.get(KEY_PDF_URL, None), f'{key}/{KEY_PDF_URL}'),
+        )
+        for asset in assets:
+            if not is_url(asset[0]):
+                continue
+            ResourceRequest.create(
+                self.guid, files, lambda res: self.get_backup_path(asset[1], res, False),
+                asset[0], guess_ext=KEY_TO_EXT.get(key, None)
+            )
+
+    def export__LuaScript(self, key, value, files: FileExports):
+        if value and str(value).strip():
+            files.add(self.get_path(self.FILE_LUA), value)
+        else:
+            self.export_raw(key, value, files)
+
+    def export__XmlUI(self, key, value, files: FileExports):
+        if value and str(value).strip():
+            files.add(self.get_path(self.FILE_XML), value)
+        else:
+            self.export_raw(key, value, files)
+
+    def export__LuaScriptState(self, key, value, files: FileExports):
+        if not (value and str(value).strip()):
+            self.export_raw(key, value, files)
+            return
+        if type(value) is str:
+            files.add(self.get_path(self.FILE_LUA_STATE_RAW), value)
+        else:
+            files.add(self.get_path(self.FILE_LUA_STATE), json_dumps(value))
 
