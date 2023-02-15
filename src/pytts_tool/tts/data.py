@@ -673,3 +673,29 @@ class TTSSaveObject(TTSBase):
         else:
             files.add(self.get_path(self.FILE_LUA_STATE), json_dumps(value))
 
+class StringLineIterator(object):
+    def __init__(self, a_string):
+        if a_string is None or a_string is False:
+            self.lines = []
+        else:
+            self.lines = a_string.splitlines()
+
+        self.len = len(self.lines)
+        self.index = 0
+
+    def next(self):
+        if self.len <= self.index:
+            return None
+
+        line = self.lines[self.index].rstrip()
+        self.index += 1
+        return line
+
+class LuaScriptExtractor():
+    # #include /absolute/path
+    # Setting: USER_FOLDER/Documents/Tabletop Simulator
+    # #include relative/path (first relative to setting, then to included file)
+    # #include !/path (always relative to setting)
+    # enclose path in <> to enclose contents in do ... end, so strip do ... end?
+    pass
+
