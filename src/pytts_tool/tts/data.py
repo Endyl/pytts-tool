@@ -1,6 +1,8 @@
 from collections import namedtuple, defaultdict
 import json
 import mimetypes
+from pathlib import Path
+import re
 import os, os.path
 from urllib.parse import urlparse
 import time
@@ -191,20 +193,32 @@ class ResourceRequest:
         chunk_size = None if chunk_encoded else 8192
         time.sleep(0.1)
         with requests.get(self.url, stream=True) as r:
-            r.raise_for_status()
-            with open(path, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=chunk_size):
-                    if (chunk_encoded and chunk) or not chunk_encoded:
-                        f.write(chunk)
+            if r.status_code == 200:
+                with open(path, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=chunk_size):
+                        if (chunk_encoded and chunk) or not chunk_encoded:
+                            f.write(chunk)
+                print(f'Downloaded <{self.url}> to <{path}>')
+            else:
+                print(f'Failed to download <{self.url}> to <{path}>')
+                #r.raise_for_status()
 
 ExportPathInfo = namedtuple('ExportPathInfo', ('path', 'full', 'dir', 'name', 'ext'))
 class FileExports:
-    def __init__(self, base_path):
+    def __init__(self, base_path, lib_path):
         self.files = {}
+        self.lib = {}
         self.base_path = base_path
+        self.lib_path = lib_path
 
     def add(self, path, content):
         self.files[path] = content
+
+    def add_lib(self, path, content):
+        if (path in self.lib) and (content != self.lib[path]):
+            print(f'Mismatched content: {path}')
+            return
+        self.lib[path] = content
 
     def add_to(self, path, key, value):
         if not path in self.files:
@@ -233,6 +247,16 @@ class FileExports:
             print(f'Appending to missing key in file [{path}: {key}]')
             self.files[path][key] = []
         self.files[path][key].append(value)
+
+    def get_lib_path_info(self, fpath) -> ExportPathInfo:
+        full_path = os.path.join(self.lib_path, fpath)
+        path_parts = os.path.split(full_path)
+        return ExportPathInfo(
+            fpath,
+            full_path,
+            path_parts[0],
+            *os.path.splitext(path_parts[1])
+        )
 
     def get_path_info(self, fpath) -> ExportPathInfo:
         full_path = os.path.join(self.base_path, fpath)
@@ -267,6 +291,13 @@ class FileExports:
                 self.export_resource(pinfo, fcontent)
             else:
                 self.export_file(pinfo, fcontent)
+
+        pbar = tqdm(self.lib.items())
+        for fpath, fcontent in pbar:
+            pinfo = self.get_lib_path_info(fpath)
+            pbar.set_description(f'Exporting lib: {pinfo.full}')
+            os.makedirs(pinfo.dir, exist_ok=True)
+            self.export_file(pinfo, fcontent)
 
 
 
@@ -376,8 +407,8 @@ class TTSSave(TTSBase):
         with open(path, 'r') as savefile:
             return TTSSave(json.load(savefile), None, None, '', *args, **kwargs)
 
-    def export_as_project(self, export_path):
-        self.files = FileExports(export_path)
+    def export_as_project(self, export_path, lib_path):
+        self.files = FileExports(export_path, lib_path)
         self.files.add(self.FILE_MAIN, {})
 
         # Export fields
@@ -420,7 +451,9 @@ class TTSSave(TTSBase):
 
     def export__LuaScript(self, key, value, files: FileExports):
         if value and str(value).strip():
-            files.add(self.get_path(self.FILE_LUA), value)
+            lse = LuaScriptExtractor(self, files, 'file', self.get_path(self.FILE_LUA), value)
+            lse.extract()
+            #files.add(self.get_path(self.FILE_LUA), value)
         else:
             self.export_raw(key, value, files)
 
@@ -654,7 +687,9 @@ class TTSSaveObject(TTSBase):
 
     def export__LuaScript(self, key, value, files: FileExports):
         if value and str(value).strip():
-            files.add(self.get_path(self.FILE_LUA), value)
+            lse = LuaScriptExtractor(self, files, 'file', self.get_path(self.FILE_LUA), value)
+            lse.extract()
+            #files.add(self.get_path(self.FILE_LUA), value)
         else:
             self.export_raw(key, value, files)
 
@@ -692,10 +727,105 @@ class StringLineIterator(object):
         return line
 
 class LuaScriptExtractor():
+    RE_INCLUDE = re.compile(r'^----#include\s+(<?(/|!/|~!|).+>?)\s*$')
+    RE_WRAPPED = re.compile(r'^<(.*)>$')
+
+    RE_ABSOLUTE = re.compile(r'^#include\s+(/.+)\s*$')
+    RE_ABSOLUTE_WRAPPED = re.compile(r'^#include\s+<(/.+)>\s*$')
+    RE_RELATIVE = re.compile(r'^#include\s+([^~/!].+)\s*$')
+    RE_RELATIVE_WRAPPED = re.compile(r'^#include\s+<([^~/!].+)>\s*$')
+    RE_FIXED = re.compile(r'^#include\s+(!/.+)\s*$')
+    RE_FIXED_WRAPPED = re.compile(r'^#include\s+<(!/.+)>\s*$')
+    RE_HOME = re.compile(r'^#include\s+(~/.+)\s*$')
+    RE_HOME_FIXED = re.compile(r'^#include\s+<(~/.+)>\s*$')
+
+    INCLUDE_TYPE = {
+        '/': 'absolute',
+        '!/': 'fixed',
+        '~/': 'home',
+    }
+
     # #include /absolute/path
     # Setting: USER_FOLDER/Documents/Tabletop Simulator
     # #include relative/path (first relative to setting, then to included file)
     # #include !/path (always relative to setting)
+    # #include ~/path (relative to user home)
     # enclose path in <> to enclose contents in do ... end, so strip do ... end?
-    pass
+    def __init__(self, save: TTSBase, files: FileExports, file_type, key, src, marker = None):
+        self.save = save
+        self.files = files
+        self.file_type = file_type
+        self.key = key
+        self.iterator = src if isinstance(src, StringLineIterator) else StringLineIterator(src)
+        self.marker = marker
 
+    def get_include_info(self, line_match):
+        raw_path = line_match.group(1)
+        raw_type = line_match.group(2)
+
+        include_type = self.INCLUDE_TYPE.get(raw_type, 'relative')
+        wrapped = True if self.RE_WRAPPED.match(raw_path) else False
+        path = raw_path[1:-1] if wrapped else raw_path
+
+        return include_type, path, wrapped
+
+    def get_include_path(self, include_type, path):
+        if 'absolute' == include_type:
+            return path
+        elif 'fixed' == include_type:
+            return path[2:]
+        elif 'home' == include_type:
+            return path
+        elif 'relative' == include_type:
+            if self.save.FILE_LUA == self.key:
+                return path
+            else:
+                return os.path.normpath(Path(self.key).parent / path)
+        else:
+            print(f'Unknown include type: {include_type} [{path}]')
+
+    def process_line(self, contents, line):
+        line_match = self.RE_INCLUDE.match(line)
+        #print(line)
+        if line_match:
+            include_type, path, wrapped = self.get_include_info(line_match)
+            if path == self.marker:
+                #print(f'end of {path}')
+                # end of included file
+                return False
+            else:
+                # process included file
+                include_path = self.get_include_path(include_type, path)
+                #print(f'Extract include: {include_path}')
+                lse = LuaScriptExtractor(
+                    self.save,
+                    self.files,
+                    'lib',
+                    include_path,
+                    self.iterator,
+                    path,
+                )
+                lse.extract()
+                ipath = f'<{path}>' if wrapped else path
+                contents.append(f'#include {ipath}')
+                return True
+        else:
+            contents.append(line)
+            return True
+
+    def extract(self):
+        contents = []
+        while True:
+            line = self.iterator.next()
+            if line is None:
+                break
+            if not self.process_line(contents, line):
+                break
+
+        if 'file' == self.file_type:
+            self.files.add(f'{self.key}', '\n'.join(contents))
+            pass
+        elif 'lib' == self.file_type:
+            self.files.add_lib(f'{self.key}.ttslua', '\n'.join(contents))
+        else:
+            print(f'Unknown file type [{self.file_type}]: {self.key}')

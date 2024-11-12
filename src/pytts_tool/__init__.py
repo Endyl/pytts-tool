@@ -1,4 +1,5 @@
 import json
+import os.path
 
 import click
 import tomli
@@ -17,7 +18,7 @@ def format_path(conf, path):
 
 def extract_save(path_to_save, path_to_project, do_backup=False):
     tts_save = TTSSave.from_save(path_to_save, do_backup=do_backup)
-    tts_save.export_as_project(path_to_project)
+    tts_save.export_as_project(path_to_project, os.path.join(path_to_project, 'lib'))
 
 
 @click.group('pytts_tool')
@@ -37,4 +38,11 @@ def pytts_extract(save, output, config, do_backup):
     save = save or conf_save
     output = output or conf_out
     extract_save(save, output, do_backup)
+
+@pytts_tool.command('extract2')
+def pytts_extract_2():
+    from .tts.structured import TTSSave
+    with open('000-data/testing/TFMARS_vVERSION.json', 'r') as f:
+        data = json.load(f)
+    save = TTSSave.model_validate(data)
 

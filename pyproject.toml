@@ -12,6 +12,7 @@
         "click",
         "arrow",
         "attrs",
+        "pydantic",
         "requests",
         "tomli",
         "tomli-w",
