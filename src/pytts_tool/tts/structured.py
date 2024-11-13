@@ -4,10 +4,10 @@ TODO:
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Annotated, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
-
+# ==================================================================== Global #
 class TTSRGBColor(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
@@ -46,6 +46,7 @@ class TTSTransform(BaseModel):
     scaleZ: float
 
 
+# ================================================================ Save Parts #
 class TTSGrid(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
@@ -139,11 +140,66 @@ class TTSSnapPoint(BaseModel):
 
     Position: TTSCoordinate
     Rotation: TTSRotation
-    Tags: Optional[list[str]]
+    Tags: Optional[list[str]] = Field(default_factory=list)
+
+
+# ============================================================== Object Parts #
+class TTSBaseCustomImage(BaseModel):
+    ImageURL: str  # url
+    ImageSecondaryURL: str  # url
+    ImageScalar: float
+    WidthScale: float
+
+
+class TTSCustomToken(BaseModel):
+    Thickness: float
+    MergeDistancePixels: float
+    StandUp: bool
+    Stackable: bool
+
+
+class TTSCustomTile(BaseModel):
+    Type: int
+    Thickness: float
+    Stackable: bool
+    Stretch: bool
+
+
+class TTSTokenCustomImage(TTSBaseCustomImage):
+    CustomToken: TTSCustomToken
+
+
+class TTSTileCustomImage(TTSBaseCustomImage):
+    CustomTile: TTSCustomTile
 
 
 class TTSDeck(BaseModel):
     pass
+
+
+# =================================================================== Objects #
+class TTSObjectBase(BaseModel):
+    GUID: str
+    Name: str  # enum?
+    Nickname: str
+    Description: str
+    GMNotes: str
+
+    ColorDiffuse: TTSRGBColor
+    Transform: TTSTransform
+
+    Grid: bool
+    Snap: bool
+    Sticky: bool
+    Tooltip: bool
+    IgnoreFoW: bool
+    Locked: bool
+    GridProjection: bool
+    Autoraise: bool
+
+    XmlUI: str
+    LuaScript: str
+    LuaScriptState: str
 
 
 class TTSObject(BaseModel):
@@ -168,11 +224,11 @@ class TTSObject(BaseModel):
     Tooltip: bool
     GridProjection: bool
     Hands: bool
-    AttachedSnapPoints: list[TTSSnapPoint]
+    AttachedSnapPoints: Optional[list[TTSSnapPoint]] = Field(default_factory=list)
     LuaScript: str
     LuaScriptState: str
     XmlUI: str
-    ContainedObjects: list[TTSObject]
+    ContainedObjects: Optional[list[TTSObject]] = Field(default_factory=list)
 
 
 class TTSDeckObject(TTSObject):
@@ -184,6 +240,7 @@ class TTSDeckObject(TTSObject):
     CustomDeck: dict[str, TTSDeck]
 
 
+# ================================================================== SaveFile #
 class TTSSave(BaseModel):
     model_config = ConfigDict(extra='forbid')
 

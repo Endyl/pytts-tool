@@ -39,6 +39,43 @@ def pytts_extract(save, output, config, do_backup):
     output = output or conf_out
     extract_save(save, output, do_backup)
 
+@pytts_tool.command('gentypes')
+def pytts_gentypes():
+    def extract_types(types, o):
+        name = o['Name']
+        if name not in types:
+            types[name] = []
+
+        new_keys = set(o.keys())
+        types[name] = list(set(types[name]) | new_keys)
+        types['#all'] |= new_keys
+        if types['#common'] is None:
+            types['#common'] = new_keys
+        else:
+            types['#common'] &= new_keys
+
+
+        if 'ContainedObjects' in o:
+            for c in o['ContainedObjects']:
+                extract_types(types, c)
+
+    with open('000-data/testing/TFMARS_vVERSION.json', 'r') as f:
+        data = json.load(f)
+
+    types = {
+        '#all': set(),
+        '#common': None,
+    }
+    for o in data['ObjectStates']:
+        extract_types(types, o)
+
+    for k in (set(types.keys()) - set(['#all', '#common'])):
+        types[f'{k}-unique'] = list(set(types[k]) - types['#common'])
+    types['#all'] = list(types['#all'])
+    types['#common'] = list(types['#common'])
+    print(json.dumps(types, indent=2))
+
+
 @pytts_tool.command('extract2')
 def pytts_extract_2():
     from .tts.structured import TTSSave
