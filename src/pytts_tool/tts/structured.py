@@ -171,7 +171,7 @@ class TTSCustomToken(BaseModel):
 
     Thickness: float
     MergeDistancePixels: float
-    StandUp: bool
+    StandUp: bool = True
     Stackable: bool
 
 
@@ -211,8 +211,10 @@ class TTSDeck(BaseModel):
 class TTSText(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
-    Colorstate: TTSRGBColor
-    fontsize: int | float
+    Colorstate: TTSRGBColor | None = None
+    colorstate: TTSRGBColor | None = None
+    fontSize: int | float | None = None
+    fontsize: int | float | None = None
     Text: str
 
 
@@ -326,7 +328,7 @@ class TTSObjectBase(BaseModel):
 
 
 class TTSObjectBaseHandable(TTSObjectBase):
-    Hands: bool
+    Hands: bool = True
     HideWhenFaceDown: bool = True
 
 
@@ -451,6 +453,10 @@ class TTSDeckCustomObject(TTSObjectBaseHandable):
     ContainedObjects: list[TTSCardObject]
 
 
+class TTSScriptingTriggerObject(TTSObjectBaseHandable):
+    Name: Literal['ScriptingTrigger']
+
+
 
 TTSObject = Annotated[
     Union[
@@ -466,6 +472,7 @@ TTSObject = Annotated[
         TTSChineseCheckersPieceObject,
         TTSCustomModelObject,
         TTSDeckCustomObject,
+        TTSScriptingTriggerObject,
     ],
     Field(discriminator='Name')
 ]
