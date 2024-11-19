@@ -278,6 +278,13 @@ class TTSCustomShader(BaseModel):
     SpecularSharpness: float
 
 
+class TTSRotationValue(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    Value: str
+    Rotation: TTSRotation
+
+
 # =================================================================== Objects #
 class TTSObjectBase(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -363,6 +370,21 @@ class TTSCustomModelInfiniteBagObject(TTSObjectBaseHandable):
     ContainedObjects: list[TTSObject]
 
 
+class TTSCustomTileObject(TTSObjectBaseHandable):
+    Name: Literal['Custom_Tile']
+    AttachedSnapPoints: list[TTSSnapPoint]
+    CustomImage: TTSTileCustomImage
+    DragSelectable: bool = True
+    LayoutGroupSortIndex: int | None = None
+    MeasureMovement: bool = False
+    PhysicsMaterial: TTSPhysicsMaterial | None = None
+    RigidBody: TTSRigidBody | None = None
+    RotationValues: list[TTSRotationValue] | None = None
+    States: dict[int, TTSCustomTileObject] | None = None
+    Value: int | None = None
+
+
+
 TTSObject = Annotated[
     Union[
         TTS3DTextObject,
@@ -371,6 +393,7 @@ TTSObject = Annotated[
         TTSDeckObject,
         TTSCustomAssetBundleObject,
         TTSCustomModelInfiniteBagObject,
+        TTSCustomTileObject,
     ],
     Field(discriminator='Name')
 ]
