@@ -20,6 +20,14 @@ class TTSRGBAColor(TTSRGBColor):
     a: float
 
 
+class TTSXYZColor(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    x: float
+    y: float
+    z: float
+
+
 class TTSCoordinate(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
@@ -285,6 +293,12 @@ class TTSRotationValue(BaseModel):
     Rotation: TTSRotation
 
 
+class TTSBag(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    Order: int
+
+
 # =================================================================== Objects #
 class TTSObjectBase(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -294,7 +308,7 @@ class TTSObjectBase(BaseModel):
     GUID: str
     Nickname: str
 
-    ColorDiffuse: TTSRGBColor | TTSRGBAColor
+    ColorDiffuse: TTSRGBColor | TTSRGBAColor | TTSXYZColor
     Transform: TTSTransform
 
     Autoraise: bool
@@ -395,6 +409,20 @@ class TTSCustomTokenObject(TTSObjectBaseHandable):
     Value: int | None = None
 
 
+class TTSCustomModelBagObject(TTSObjectBaseHandable):
+    Name: Literal['Custom_Model_Bag']
+    Bag: TTSBag | None = None
+    CustomMesh: TTSCustomMesh
+    DragSelectable: bool = True
+    LayoutGroupSortIndex: int | None = None
+    MaterialIndex: int
+    MeasureMovement: bool = False
+    MeshIndex: int
+    Number: int | None = None
+    Value: int | None = None
+    ContainedObjects: list[TTSObject] | None = None
+
+
 
 TTSObject = Annotated[
     Union[
@@ -406,6 +434,7 @@ TTSObject = Annotated[
         TTSCustomModelInfiniteBagObject,
         TTSCustomTileObject,
         TTSCustomTokenObject,
+        TTSCustomModelBagObject,
     ],
     Field(discriminator='Name')
 ]
