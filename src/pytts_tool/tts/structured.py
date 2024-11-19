@@ -255,6 +255,29 @@ class TTSRigidBody(BaseModel):
     UseGravity: bool
 
 
+class TTSCustomMesh(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    CastShadows: bool
+    ColliderURL: str  # URL
+    Convex: bool
+    CustomShader: TTSCustomShader | None = None
+    DiffuseURL: str  # URL
+    MaterialIndex: int
+    MeshURL: str  # URL
+    NormalURL: str  # URL
+    TypeIndex: int
+
+
+class TTSCustomShader(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    FresnelStrength: float
+    SpecularColor: TTSRGBColor | TTSRGBAColor
+    SpecularIntensity: float
+    SpecularSharpness: float
+
+
 # =================================================================== Objects #
 class TTSObjectBase(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -328,7 +351,7 @@ class TTSCustomAssetBundleObject(TTSObjectBaseHandable):
 
 class TTSCustomModelInfiniteBagObject(TTSObjectBaseHandable):
     Name: Literal['Custom_Model_Infinite_Bag']
-    CustomMesh: dict
+    CustomMesh: TTSCustomMesh
     DragSelectable: bool = True
     LayoutGroupSortIndex: int | None = None
     MaterialIndex: int
