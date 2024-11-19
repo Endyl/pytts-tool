@@ -4,7 +4,7 @@ TODO:
 """
 from __future__ import annotations
 
-from typing import Annotated, Optional
+from typing import Annotated, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field
 
 # ==================================================================== Global #
@@ -14,6 +14,10 @@ class TTSRGBColor(BaseModel):
     r: float
     g: float
     b: float
+
+
+class TTSRGBAColor(TTSRGBColor):
+    a: float
 
 
 class TTSCoordinate(BaseModel):
@@ -50,33 +54,33 @@ class TTSTransform(BaseModel):
 class TTSGrid(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
-    Type: int
-    Lines: bool
-    Color: TTSRGBColor
-    Opacity: float
-    ThickLines: bool
-    Snapping: bool
-    Offset: bool
     BothSnapping: bool
+    Color: TTSRGBColor
+    Lines: bool
+    Offset: bool
+    Opacity: float
+    PosOffset: TTSCoordinate
+    Snapping: bool
+    ThickLines: bool
+    Type: int
     xSize: float
     ySize: float
-    PosOffset: TTSCoordinate
 
 
 class TTSLighting(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
-    LightIntensity: float
-    LightColor: TTSRGBColor
-    AmbientIntensity: float
-    AmbientType: int
-    AmbientSkyColor: TTSRGBColor
     AmbientEquatorColor: TTSRGBColor
     AmbientGroundColor: TTSRGBColor
-    ReflectionIntensity: float
-    LutIndex: int
+    AmbientIntensity: float
+    AmbientSkyColor: TTSRGBColor
+    AmbientType: int
+    LightColor: TTSRGBColor
+    LightIntensity: float
     LutContribution: float
+    LutIndex: int
     LutURL: str  # url
+    ReflectionIntensity: float
 
 
 class TTSHandTransform(BaseModel):
@@ -89,49 +93,50 @@ class TTSHandTransform(BaseModel):
 class TTSHands(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
-    Enable: bool
     DisableUnused: bool
+    Enable: bool
     Hiding: int
+
     HandTransforms: list[TTSHandTransform]
 
 
 class TTSTurns(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
+    DisableInteractions: bool
     Enable: bool
-    Type: int
-    TurnOrder: list[str]  # colorstrings
+    PassTurns: bool
     Reverse: bool
     SkipEmpty: bool
-    DisableInteractions: bool
-    PassTurns: bool
     TurnColor: str  # colorstring?
+    TurnOrder: list[str]  # colorstrings
+    Type: int
 
 
 class TTSTabState(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
-    title: str
     body: str
     color: str  # colorstring?
-    visibleColor: TTSRGBColor
     id: int
+    title: str
+    visibleColor: TTSRGBColor
 
 
 class TTSCameraState(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
+    Distance: float
     Position: TTSCoordinate
     Rotation: TTSRotation
-    Distance: float
     Zoomed: bool
 
 
 class TTSDecal(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
-    Name: str
     ImageURL: str  # url
+    Name: str
     Size: float
 
 
@@ -145,6 +150,8 @@ class TTSSnapPoint(BaseModel):
 
 # ============================================================== Object Parts #
 class TTSBaseCustomImage(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
     ImageURL: str  # url
     ImageSecondaryURL: str  # url
     ImageScalar: float
@@ -152,6 +159,8 @@ class TTSBaseCustomImage(BaseModel):
 
 
 class TTSCustomToken(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
     Thickness: float
     MergeDistancePixels: float
     StandUp: bool
@@ -159,6 +168,8 @@ class TTSCustomToken(BaseModel):
 
 
 class TTSCustomTile(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
     Type: int
     Thickness: float
     Stackable: bool
@@ -173,98 +184,132 @@ class TTSTileCustomImage(TTSBaseCustomImage):
     CustomTile: TTSCustomTile
 
 
+class TTSCustomDeck(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    FaceURL: str  # URL
+    BackURL: str  # URL
+    NumWidth: int
+    NumHeight: int
+    BackIsHidden: bool
+    UniqueBack: bool
+    Type: int | None = None
+
+
 class TTSDeck(BaseModel):
     pass
 
 
+class TTSText(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    Colorstate: TTSRGBColor
+    fontsize: int | float
+    Text: str
+
+
 # =================================================================== Objects #
 class TTSObjectBase(BaseModel):
-    GUID: str
-    Name: str  # enum?
-    Nickname: str
+    model_config = ConfigDict(extra='forbid')
+
     Description: str
     GMNotes: str
+    GUID: str
+    Nickname: str
 
-    ColorDiffuse: TTSRGBColor
+    ColorDiffuse: TTSRGBColor | TTSRGBAColor
     Transform: TTSTransform
 
+    Autoraise: bool
     Grid: bool
+    GridProjection: bool
+    IgnoreFoW: bool
+    Locked: bool
     Snap: bool
     Sticky: bool
     Tooltip: bool
-    IgnoreFoW: bool
-    Locked: bool
-    GridProjection: bool
-    Autoraise: bool
 
     XmlUI: str
     LuaScript: str
     LuaScriptState: str
 
 
-class TTSObject(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-
-    GUID: str
-    Name: str  # enum?
-    Transform: TTSTransform
-    Nickname: str
-    Description: str
-    GMNotes: str
-    ColorDiffuse: TTSRGBColor
-    LayoutGroupSortIndex: int
-    Locked: bool
-    Grid: bool
-    Snap: bool
-    IgnoreFoW: bool
-    MeasureMovement: bool
-    DragSelectable: bool
-    Autoraise: bool
-    Sticky: bool
-    Tooltip: bool
-    GridProjection: bool
+class TTSObjectBaseHandable(TTSObjectBase):
     Hands: bool
-    AttachedSnapPoints: Optional[list[TTSSnapPoint]] = Field(default_factory=list)
-    LuaScript: str
-    LuaScriptState: str
-    XmlUI: str
-    ContainedObjects: Optional[list[TTSObject]] = Field(default_factory=list)
-
-
-class TTSDeckObject(TTSObject):
-    model_config = ConfigDict(extra='forbid')
-
     HideWhenFaceDown: bool
+
+
+class TTS3DTextObject(TTSObjectBaseHandable):
+    Name: Literal['3DText']
+    Text: TTSText
+
+
+class TTSBlockSquareObject(TTSObjectBaseHandable):
+    Name: Literal['BlockSquare']
+
+
+class TTSCardObject(TTSObjectBaseHandable):
+    Name: Literal['Card']
+    CardID: int
+    CustomDeck: dict[int, TTSCustomDeck]
+    DragSelectable: bool = True
+    LayoutGroupSortIndex: int | None = None
+    MeasureMovement: bool = False
+    PysicsMaterial: dict | None = None
+    RigidBody: dict | None = None
     SidewaysCard: bool
+    Value: int | None = None
+
+
+class TTSDeckObject(TTSObjectBaseHandable):
+    Name: Literal['Deck']
+    CustomDeck: dict[int, TTSCustomDeck]
     DeckIDs: list[int]
-    CustomDeck: dict[str, TTSDeck]
+    DragSelectable: bool = True
+    LayoutGroupSortIndex: int | None = None
+    MeasureMovement: bool = False
+    SidewaysCard: bool
+    Value: int | None = None
+    ContainedObjects: list[TTSObject]
+
+
+TTSObject = Annotated[
+    Union[
+        TTS3DTextObject,
+        TTSBlockSquareObject,
+        TTSCardObject,
+        TTSDeckObject,
+    ],
+    Field(discriminator='Name')
+]
 
 
 # ================================================================== SaveFile #
 class TTSSave(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
-    SaveName: str
+    CameraStates: list[None | TTSCameraState]
+    Date: str  # 4/4/2020 6:45:12 PM
+    DecalPallet: list[TTSDecal]
     GameMode: str
     Gravity: float
-    PlayArea: float
-    Date: str  # 4/4/2020 6:45:12 PM
-    Table: str
-    TableURL: str  # url
-    Sky: str
-    SkyURL: str  # url
-    Note: str
-    Rules: str
-    XmlUI: str
+    Grid: TTSGrid
+    Hands: TTSHands
+    Lighting: TTSLighting
     LuaScript: str
     LuaScriptState: str
-    Grid: TTSGrid
-    Lighting: TTSLighting
-    Hands: TTSHands
-    Turns: TTSTurns
-    TabStates: dict[str, TTSTabState]
-    CameraStates: list[None | TTSCameraState]
-    DecalPallet: list[TTSDecal]
-    ObjectStates: list[TTSObject | TTSDeckObject]
+    Note: str
+    PlayArea: float
+    Rules: str
+    SaveName: str
+    Sky: str
+    SkyURL: str  # url
     SnapPoints: list[TTSSnapPoint]
+    TabStates: dict[str, TTSTabState]
+    Table: str
+    TableURL: str  # url
+    Turns: TTSTurns
     VersionNumber: str
+    XmlUI: str
+
+    ObjectStates: list[TTSObject]

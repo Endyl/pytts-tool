@@ -41,6 +41,7 @@ def pytts_extract(save, output, config, do_backup):
 
 @pytts_tool.command('gentypes')
 def pytts_gentypes():
+    from .tts.type_extract import Types
     def extract_types(types, o):
         name = o['Name']
         if name not in types:
@@ -62,6 +63,10 @@ def pytts_gentypes():
     with open('000-data/testing/TFMARS_vVERSION.json', 'r') as f:
         data = json.load(f)
 
+    t = Types()
+    t.extract_save(data)
+    print(json.dumps(t.serialize(), indent=2))
+    """
     types = {
         '#all': set(),
         '#common': None,
@@ -74,6 +79,7 @@ def pytts_gentypes():
     types['#all'] = list(types['#all'])
     types['#common'] = list(types['#common'])
     print(json.dumps(types, indent=2))
+    """
 
 
 @pytts_tool.command('extract2')
