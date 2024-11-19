@@ -307,6 +307,20 @@ class TTSCustomAssetBundleObject(TTSObjectBaseHandable):
     JointHinge: TTSJointHinge | None = None
 
 
+class TTSCustomModelInfiniteBagObject(TTSObjectBaseHandable):
+    Name: Literal['Custom_Model_Infinite_Bag']
+    CustomMesh: dict
+    DragSelectable: bool = True
+    LayoutGroupSortIndex: int | None = None
+    MaterialIndex: int
+    MeasureMovement: bool = False
+    MeshIndex: int
+    PhysicsMaterial: dict | None = None
+    RigidBody: dict | None = None
+    Value: int | None = None
+    ContainedObjects: list[TTSObject]
+
+
 TTSObject = Annotated[
     Union[
         TTS3DTextObject,
@@ -314,6 +328,7 @@ TTSObject = Annotated[
         TTSCardObject,
         TTSDeckObject,
         TTSCustomAssetBundleObject,
+        TTSCustomModelInfiniteBagObject,
     ],
     Field(discriminator='Name')
 ]
