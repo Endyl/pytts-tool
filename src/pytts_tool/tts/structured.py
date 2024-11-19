@@ -208,6 +208,34 @@ class TTSText(BaseModel):
     Text: str
 
 
+class TTSJointHinge(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    Anchor: dict
+    Axis: dict
+    BreakForce: str
+    BreakTorgue: str
+    ConnectedAnchor: dict
+    ConnectedBodyGUID: str  # GUID
+    EnableCollision: bool
+    Limits: dict
+    Motor: dict
+    Spring: dict
+    UseLimits: bool
+    UseMotor: bool
+    UseSpring: bool
+
+
+class TTSCustomAssetBundle(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    AssetbundleURL: str  # URL
+    AssetbundleSecondaryURL: str  # URL
+    MaterialIndex: int
+    TypeIndex: int
+    LoopingEffectIndex: int
+
+
 # =================================================================== Objects #
 class TTSObjectBase(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -273,12 +301,19 @@ class TTSDeckObject(TTSObjectBaseHandable):
     ContainedObjects: list[TTSObject]
 
 
+class TTSCustomAssetBundleObject(TTSObjectBaseHandable):
+    Name: Literal['Custom_Assetbundle']
+    CustomAssetbundle: TTSCustomAssetBundle
+    JointHinge: TTSJointHinge | None = None
+
+
 TTSObject = Annotated[
     Union[
         TTS3DTextObject,
         TTSBlockSquareObject,
         TTSCardObject,
         TTSDeckObject,
+        TTSCustomAssetBundleObject,
     ],
     Field(discriminator='Name')
 ]
