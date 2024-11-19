@@ -372,7 +372,7 @@ class TTSCustomModelInfiniteBagObject(TTSObjectBaseHandable):
 
 class TTSCustomTileObject(TTSObjectBaseHandable):
     Name: Literal['Custom_Tile']
-    AttachedSnapPoints: list[TTSSnapPoint]
+    AttachedSnapPoints: list[TTSSnapPoint] | None = None
     CustomImage: TTSTileCustomImage
     DragSelectable: bool = True
     LayoutGroupSortIndex: int | None = None
@@ -381,6 +381,17 @@ class TTSCustomTileObject(TTSObjectBaseHandable):
     RigidBody: TTSRigidBody | None = None
     RotationValues: list[TTSRotationValue] | None = None
     States: dict[int, TTSCustomTileObject] | None = None
+    Value: int | None = None
+
+
+class TTSCustomTokenObject(TTSObjectBaseHandable):
+    Name: Literal['Custom_Token']
+    AttachedSnapPoints: list[TTSSnapPoint] | None = None
+    CustomImage: TTSTokenCustomImage
+    DragSelectable: bool = True
+    LayoutGroupSortIndex: int | None = None
+    MeasureMovement: bool = False
+    States: dict[int, TTSCustomTokenObject] | None = None
     Value: int | None = None
 
 
@@ -394,6 +405,7 @@ TTSObject = Annotated[
         TTSCustomAssetBundleObject,
         TTSCustomModelInfiniteBagObject,
         TTSCustomTileObject,
+        TTSCustomTokenObject,
     ],
     Field(discriminator='Name')
 ]
