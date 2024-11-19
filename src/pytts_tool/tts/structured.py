@@ -327,7 +327,7 @@ class TTSObjectBase(BaseModel):
 
 class TTSObjectBaseHandable(TTSObjectBase):
     Hands: bool
-    HideWhenFaceDown: bool
+    HideWhenFaceDown: bool = True
 
 
 class TTS3DTextObject(TTSObjectBaseHandable):
@@ -342,7 +342,7 @@ class TTSBlockSquareObject(TTSObjectBaseHandable):
 class TTSCardObject(TTSObjectBaseHandable):
     Name: Literal['Card']
     CardID: int
-    CustomDeck: dict[int, TTSCustomDeck]
+    CustomDeck: dict[int, TTSCustomDeck] | None = None
     DragSelectable: bool = True
     LayoutGroupSortIndex: int | None = None
     MeasureMovement: bool = False
@@ -350,6 +350,7 @@ class TTSCardObject(TTSObjectBaseHandable):
     RigidBody: TTSRigidBody | None = None
     SidewaysCard: bool
     Value: int | None = None
+    ContainedObjects: list[TTSCardObject] | None = None
 
 
 class TTSDeckObject(TTSObjectBaseHandable):
@@ -361,7 +362,7 @@ class TTSDeckObject(TTSObjectBaseHandable):
     MeasureMovement: bool = False
     SidewaysCard: bool
     Value: int | None = None
-    ContainedObjects: list[TTSObject]
+    ContainedObjects: list[TTSCardObject]
 
 
 class TTSCustomAssetBundleObject(TTSObjectBaseHandable):
@@ -438,6 +439,18 @@ class TTSCustomModelObject(TTSObjectBaseHandable):
     States: dict[int, TTSCustomModelObject] | None = None
 
 
+class TTSDeckCustomObject(TTSObjectBaseHandable):
+    Name: Literal['DeckCustom']
+    CustomDeck: dict[int, TTSCustomDeck]
+    DeckIDs: list[int]
+    DragSelectable: bool = True
+    LayoutGroupSortIndex: int | None = None
+    MeasureMovement: bool = False
+    SidewaysCard: bool
+    Value: int | None = None
+    ContainedObjects: list[TTSCardObject]
+
+
 
 TTSObject = Annotated[
     Union[
@@ -452,6 +465,7 @@ TTSObject = Annotated[
         TTSCustomModelBagObject,
         TTSChineseCheckersPieceObject,
         TTSCustomModelObject,
+        TTSDeckCustomObject,
     ],
     Field(discriminator='Name')
 ]
