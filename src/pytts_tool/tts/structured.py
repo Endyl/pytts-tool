@@ -423,6 +423,11 @@ class TTSCustomModelBagObject(TTSObjectBaseHandable):
     ContainedObjects: list[TTSObject] | None = None
 
 
+class TTSChineseCheckersPieceObject(TTSObjectBaseHandable):
+    Name: Literal['Chinese_Checkers_Piece']
+    MaterialIndex: int
+
+
 
 TTSObject = Annotated[
     Union[
@@ -435,6 +440,7 @@ TTSObject = Annotated[
         TTSCustomTileObject,
         TTSCustomTokenObject,
         TTSCustomModelBagObject,
+        TTSChineseCheckersPieceObject,
     ],
     Field(discriminator='Name')
 ]
