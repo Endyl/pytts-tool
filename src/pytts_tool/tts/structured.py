@@ -428,6 +428,16 @@ class TTSChineseCheckersPieceObject(TTSObjectBaseHandable):
     MaterialIndex: int
 
 
+class TTSCustomModelObject(TTSObjectBaseHandable):
+    Name: Literal['Custom_Model']
+    CustomMesh: TTSCustomMesh
+    DragSelectable: bool = True
+    MeasureMovement: bool = False
+    PhysicsMaterial: TTSPhysicsMaterial | None = None
+    RigidBody: TTSRigidBody | None = None
+    States: dict[int, TTSCustomModelObject] | None = None
+
+
 
 TTSObject = Annotated[
     Union[
@@ -441,6 +451,7 @@ TTSObject = Annotated[
         TTSCustomTokenObject,
         TTSCustomModelBagObject,
         TTSChineseCheckersPieceObject,
+        TTSCustomModelObject,
     ],
     Field(discriminator='Name')
 ]
