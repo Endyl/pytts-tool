@@ -236,6 +236,25 @@ class TTSCustomAssetBundle(BaseModel):
     LoopingEffectIndex: int
 
 
+class TTSPhysicsMaterial(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    BounceCombine: int
+    Bounciness: float
+    DynamicFriction: float
+    FrictionCombine: int
+    StaticFriction: float
+
+
+class TTSRigidBody(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    AngularGrag: float
+    Drag: float
+    Mass: float
+    UseGravity: bool
+
+
 # =================================================================== Objects #
 class TTSObjectBase(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -283,8 +302,8 @@ class TTSCardObject(TTSObjectBaseHandable):
     DragSelectable: bool = True
     LayoutGroupSortIndex: int | None = None
     MeasureMovement: bool = False
-    PysicsMaterial: dict | None = None
-    RigidBody: dict | None = None
+    PysicsMaterial: TTSPhysicsMaterial | None = None
+    RigidBody: TTSRigidBody | None = None
     SidewaysCard: bool
     Value: int | None = None
 
@@ -315,8 +334,8 @@ class TTSCustomModelInfiniteBagObject(TTSObjectBaseHandable):
     MaterialIndex: int
     MeasureMovement: bool = False
     MeshIndex: int
-    PhysicsMaterial: dict | None = None
-    RigidBody: dict | None = None
+    PhysicsMaterial: TTSPhysicsMaterial | None = None
+    RigidBody: TTSRigidBody | None = None
     Value: int | None = None
     ContainedObjects: list[TTSObject]
 
