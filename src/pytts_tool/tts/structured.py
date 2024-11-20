@@ -504,6 +504,10 @@ class TTSCardCustomObject(TTSObjectBaseHandable):
     SidewaysCard: bool
 
 
+class TTSGoGamePieceBlackObject(TTSObjectBaseHandable):
+    Name: Literal['go_game_piece_black']
+
+
 TTSObject = Annotated[
     Union[
         TTS3DTextObject,
@@ -524,6 +528,7 @@ TTSObject = Annotated[
         TTSCustomPDFObject,
         TTSInfiniteBagObject,
         TTSCardCustomObject,
+        TTSGoGamePieceBlackObject,
     ],
     Field(discriminator='Name')
 ]
