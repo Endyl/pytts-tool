@@ -361,8 +361,8 @@ class TTSCardObject(TTSObjectBaseHandable):
     DragSelectable: bool = True
     LayoutGroupSortIndex: int | None = None
     MeasureMovement: bool = False
-    PysicsMaterial: TTSPhysicsMaterial | None = None
-    RigidBody: TTSRigidBody | None = Field(default=None, alias='Rigidbody')
+    PhysicsMaterial: TTSPhysicsMaterial | None = None
+    RigidBody: TTSRigidBody | None = Field(default=None, validation_alias=AliasChoices('RigidBody', 'Rigidbody'))
     SidewaysCard: bool
     Value: int | None = None
     ContainedObjects: list[TTSCardObject] | None = None
@@ -497,6 +497,12 @@ class TTSInfiniteBagObject(TTSObjectBaseHandable):
     ContainedObjects: list[TTSObject] | None = None
 
 
+class TTSCardCustomObject(TTSObjectBaseHandable):
+    Name: Literal['CardCustom']
+    CardID: int
+    CustomDeck: dict[int, TTSCustomDeck] | None = None
+    SidewaysCard: bool
+
 
 TTSObject = Annotated[
     Union[
@@ -517,6 +523,7 @@ TTSObject = Annotated[
         TTSCustomAssetbundleBagObject,
         TTSCustomPDFObject,
         TTSInfiniteBagObject,
+        TTSCardCustomObject,
     ],
     Field(discriminator='Name')
 ]
