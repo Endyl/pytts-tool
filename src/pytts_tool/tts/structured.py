@@ -305,6 +305,15 @@ class TTSCounter(BaseModel):
     value: int
 
 
+class TTSCustomPDF(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    PDFPage: int
+    PDFPageOffset: int
+    PDFPassword: str
+    PDFUrl: str  # URL
+
+
 # =================================================================== Objects #
 class TTSObjectBase(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -474,6 +483,13 @@ class TTSCustomAssetbundleBagObject(TTSObjectBaseHandable):
     ContainedObjects: list[TTSObject] | None = None
 
 
+class TTSCustomPDFObject(TTSObjectBaseHandable):
+    Name: Literal['Custom_PDF']
+    CustomPDF: TTSCustomPDF
+    DragSelectable: bool = True
+    MeasureMovement: bool = False
+
+
 
 TTSObject = Annotated[
     Union[
@@ -492,6 +508,7 @@ TTSObject = Annotated[
         TTSScriptingTriggerObject,
         TTSCounterObject,
         TTSCustomAssetbundleBagObject,
+        TTSCustomPDFObject,
     ],
     Field(discriminator='Name')
 ]
