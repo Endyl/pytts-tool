@@ -85,7 +85,12 @@ def pytts_gentypes():
 @pytts_tool.command('extract2')
 def pytts_extract_2():
     from .tts.structured import TTSSave
-    with open('000-data/testing/TFMARS_vVERSION.json', 'r') as f:
+    TEST_FILES = {
+        'TFMARS': '000-data/testing/TFMARS_vVERSION.json',
+        'SZUV': '000-data/Saves/szuv.json',
+    }
+    with open(TEST_FILES['SZUV'], 'r') as f:
         data = json.load(f)
     save = TTSSave.model_validate(data)
+    print(save.model_dump_json(indent=2, exclude_unset=True))
 

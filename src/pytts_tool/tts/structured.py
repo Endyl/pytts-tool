@@ -105,7 +105,7 @@ class TTSHands(BaseModel):
     Enable: bool
     Hiding: int
 
-    HandTransforms: list[TTSHandTransform]
+    HandTransforms: list[TTSHandTransform] | None = None
 
 
 class TTSTurns(BaseModel):
@@ -314,6 +314,29 @@ class TTSCustomPDF(BaseModel):
     PDFUrl: str  # URL
 
 
+class TTSMusicPlayer(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    RepeatSong: bool
+    PlaylistEntry: int
+    CurrentAudioTitle: str
+    CurrentAudioURL: str  # URL
+    AudioLibrary: list[str]
+
+
+class TTSComponentTag(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    displayed: str
+    normalized: str
+
+
+class TTSComponentTags(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    labels: list[TTSComponentTag]
+
+
 # =================================================================== Objects #
 class TTSObjectBase(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -322,15 +345,23 @@ class TTSObjectBase(BaseModel):
     GMNotes: str
     GUID: str
     Nickname: str
+    Tags: list[str] | None = None
+    LayoutGroupSortIndex: int | None = None
+    Value: int | None = None
 
+    AttachedSnapPoints: list[TTSSnapPoint] | None = None
     ColorDiffuse: TTSRGBColor | TTSRGBAColor | TTSXYZColor
     Transform: TTSTransform
 
     Autoraise: bool
+    DragSelectable: bool = True
     Grid: bool
     GridProjection: bool
+    Hands: bool = True
+    HideWhenFaceDown: bool = True
     IgnoreFoW: bool
     Locked: bool
+    MeasureMovement: bool = False
     Snap: bool
     Sticky: bool
     Tooltip: bool
@@ -340,142 +371,106 @@ class TTSObjectBase(BaseModel):
     LuaScriptState: str
 
 
-class TTSObjectBaseHandable(TTSObjectBase):
-    Hands: bool = True
-    HideWhenFaceDown: bool = True
-
-
-class TTS3DTextObject(TTSObjectBaseHandable):
+class TTS3DTextObject(TTSObjectBase):
     Name: Literal['3DText']
     Text: TTSText
 
 
-class TTSBlockSquareObject(TTSObjectBaseHandable):
+class TTSBlockSquareObject(TTSObjectBase):
     Name: Literal['BlockSquare']
 
 
-class TTSCardObject(TTSObjectBaseHandable):
+class TTSCardObject(TTSObjectBase):
     Name: Literal['Card']
     CardID: int
     CustomDeck: dict[int, TTSCustomDeck] | None = None
-    DragSelectable: bool = True
-    LayoutGroupSortIndex: int | None = None
-    MeasureMovement: bool = False
     PhysicsMaterial: TTSPhysicsMaterial | None = None
     RigidBody: TTSRigidBody | None = Field(default=None, validation_alias=AliasChoices('RigidBody', 'Rigidbody'))
     SidewaysCard: bool
-    Value: int | None = None
     ContainedObjects: list[TTSCardObject] | None = None
 
 
-class TTSDeckObject(TTSObjectBaseHandable):
+class TTSDeckObject(TTSObjectBase):
     Name: Literal['Deck']
     CustomDeck: dict[int, TTSCustomDeck]
     DeckIDs: list[int]
-    DragSelectable: bool = True
-    LayoutGroupSortIndex: int | None = None
-    MeasureMovement: bool = False
     SidewaysCard: bool
-    Value: int | None = None
     ContainedObjects: list[TTSCardObject]
 
 
-class TTSCustomAssetBundleObject(TTSObjectBaseHandable):
+class TTSCustomAssetBundleObject(TTSObjectBase):
     Name: Literal['Custom_Assetbundle']
     CustomAssetbundle: TTSCustomAssetBundle
     JointHinge: TTSJointHinge | None = None
 
 
-class TTSCustomModelInfiniteBagObject(TTSObjectBaseHandable):
+class TTSCustomModelInfiniteBagObject(TTSObjectBase):
     Name: Literal['Custom_Model_Infinite_Bag']
     CustomMesh: TTSCustomMesh
-    DragSelectable: bool = True
-    LayoutGroupSortIndex: int | None = None
     MaterialIndex: int
-    MeasureMovement: bool = False
     MeshIndex: int
     PhysicsMaterial: TTSPhysicsMaterial | None = None
     RigidBody: TTSRigidBody | None = Field(default=None, alias='Rigidbody')
-    Value: int | None = None
     ContainedObjects: list[TTSObject]
 
 
-class TTSCustomTileObject(TTSObjectBaseHandable):
+class TTSCustomTileObject(TTSObjectBase):
     Name: Literal['Custom_Tile']
-    AttachedSnapPoints: list[TTSSnapPoint] | None = None
     CustomImage: TTSTileCustomImage
-    DragSelectable: bool = True
-    LayoutGroupSortIndex: int | None = None
-    MeasureMovement: bool = False
     PhysicsMaterial: TTSPhysicsMaterial | None = None
     RigidBody: TTSRigidBody | None = Field(default=None, alias='Rigidbody')
     RotationValues: list[TTSRotationValue] | None = None
     States: dict[int, TTSCustomTileObject] | None = None
-    Value: int | None = None
 
 
-class TTSCustomTokenObject(TTSObjectBaseHandable):
+class TTSCustomTokenObject(TTSObjectBase):
     Name: Literal['Custom_Token']
-    AttachedSnapPoints: list[TTSSnapPoint] | None = None
     CustomImage: TTSTokenCustomImage
-    DragSelectable: bool = True
-    LayoutGroupSortIndex: int | None = None
-    MeasureMovement: bool = False
     States: dict[int, TTSCustomTokenObject] | None = None
-    Value: int | None = None
+    ChildObjects: list[TTSObject] | None = None  # Attached objects?
 
 
-class TTSCustomModelBagObject(TTSObjectBaseHandable):
+class TTSCustomModelBagObject(TTSObjectBase):
     Name: Literal['Custom_Model_Bag']
     Bag: TTSBag | None = None
     CustomMesh: TTSCustomMesh
-    DragSelectable: bool = True
-    LayoutGroupSortIndex: int | None = None
     MaterialIndex: int
-    MeasureMovement: bool = False
     MeshIndex: int
     Number: int | None = None
-    Value: int | None = None
     ContainedObjects: list[TTSObject] | None = None
 
 
-class TTSChineseCheckersPieceObject(TTSObjectBaseHandable):
+class TTSChineseCheckersPieceObject(TTSObjectBase):
     Name: Literal['Chinese_Checkers_Piece']
     MaterialIndex: int
 
 
-class TTSCustomModelObject(TTSObjectBaseHandable):
+class TTSCustomModelObject(TTSObjectBase):
     Name: Literal['Custom_Model']
     CustomMesh: TTSCustomMesh
-    DragSelectable: bool = True
-    MeasureMovement: bool = False
     PhysicsMaterial: TTSPhysicsMaterial | None = None
     RigidBody: TTSRigidBody | None = Field(default=None, alias='Rigidbody')
     States: dict[int, TTSCustomModelObject] | None = None
 
 
-class TTSDeckCustomObject(TTSObjectBaseHandable):
+class TTSDeckCustomObject(TTSObjectBase):
     Name: Literal['DeckCustom']
     CustomDeck: dict[int, TTSCustomDeck]
     DeckIDs: list[int]
-    DragSelectable: bool = True
-    LayoutGroupSortIndex: int | None = None
-    MeasureMovement: bool = False
     SidewaysCard: bool
-    Value: int | None = None
     ContainedObjects: list[TTSCardObject]
 
 
-class TTSScriptingTriggerObject(TTSObjectBaseHandable):
+class TTSScriptingTriggerObject(TTSObjectBase):
     Name: Literal['ScriptingTrigger']
 
 
-class TTSCounterObject(TTSObjectBaseHandable):
+class TTSCounterObject(TTSObjectBase):
     Name: Literal['Counter']
     Counter: TTSCounter | None = None
 
 
-class TTSCustomAssetbundleBagObject(TTSObjectBaseHandable):
+class TTSCustomAssetbundleBagObject(TTSObjectBase):
     Name: Literal['Custom_Assetbundle_Bag']
     CustomAssetbundle: TTSCustomAssetBundle
     MaterialIndex: int
@@ -483,29 +478,45 @@ class TTSCustomAssetbundleBagObject(TTSObjectBaseHandable):
     ContainedObjects: list[TTSObject] | None = None
 
 
-class TTSCustomPDFObject(TTSObjectBaseHandable):
+class TTSCustomPDFObject(TTSObjectBase):
     Name: Literal['Custom_PDF']
     CustomPDF: TTSCustomPDF
-    DragSelectable: bool = True
-    MeasureMovement: bool = False
 
 
-class TTSInfiniteBagObject(TTSObjectBaseHandable):
+class TTSInfiniteBagObject(TTSObjectBase):
     Name: Literal['Infinite_Bag']
     MaterialIndex: int
     MeshIndex: int
     ContainedObjects: list[TTSObject] | None = None
 
 
-class TTSCardCustomObject(TTSObjectBaseHandable):
+class TTSCardCustomObject(TTSObjectBase):
     Name: Literal['CardCustom']
     CardID: int
     CustomDeck: dict[int, TTSCustomDeck] | None = None
     SidewaysCard: bool
 
 
-class TTSGoGamePieceBlackObject(TTSObjectBaseHandable):
+class TTSGoGamePieceBlackObject(TTSObjectBase):
     Name: Literal['go_game_piece_black']
+
+
+class TTSPlayerPawnObject(TTSObjectBase):
+    Name: Literal['PlayerPawn']
+    MaterialIndex: int
+
+
+class TTSHandTriggerObject(TTSObjectBase):
+    Name: Literal['HandTrigger']
+    FogColor: str  # colorstring?
+
+
+class TTSBagObject(TTSObjectBase):
+    Name: Literal['Bag']
+    Bag: TTSBag
+    MaterialIndex: int
+    MeshIndex: int
+    ContainedObjects: list[TTSObject] | None = None
 
 
 TTSObject = Annotated[
@@ -529,6 +540,9 @@ TTSObject = Annotated[
         TTSInfiniteBagObject,
         TTSCardCustomObject,
         TTSGoGamePieceBlackObject,
+        TTSPlayerPawnObject,
+        TTSHandTriggerObject,
+        TTSBagObject,
     ],
     Field(discriminator='Name')
 ]
@@ -538,26 +552,34 @@ TTSObject = Annotated[
 class TTSSave(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
-    CameraStates: list[None | TTSCameraState]
+    CameraStates: list[None | TTSCameraState] | None = None
+    ComponentTags: Optional[TTSComponentTags] = None
     Date: str  # 4/4/2020 6:45:12 PM
     DecalPallet: list[TTSDecal]
+    EpochTime: int | None = None
+    GameComplexity: str | None = None
     GameMode: str
+    GameType: str | None = None
     Gravity: float
     Grid: TTSGrid
     Hands: TTSHands
     Lighting: TTSLighting
     LuaScript: str
     LuaScriptState: str
+    MusicPlayer: TTSMusicPlayer | None = None
     Note: str
     PlayArea: float
-    Rules: str
+    PlayerCounts: int | list[int] | None = None
+    PlayingTime: int | list[int] | None = None
+    Rules: str | None = None
     SaveName: str
     Sky: str
     SkyURL: str  # url
-    SnapPoints: list[TTSSnapPoint]
+    SnapPoints: list[TTSSnapPoint] | None = None
     TabStates: dict[str, TTSTabState]
     Table: str
-    TableURL: str  # url
+    TableURL: str | None = None  # url
+    Tags: Optional[list[str]] = None
     Turns: TTSTurns
     VersionNumber: str
     XmlUI: str
