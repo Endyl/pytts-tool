@@ -466,6 +466,14 @@ class TTSCounterObject(TTSObjectBaseHandable):
     Counter: TTSCounter | None = None
 
 
+class TTSCustomAssetbundleBagObject(TTSObjectBaseHandable):
+    Name: Literal['Custom_Assetbundle_Bag']
+    CustomAssetbundle: TTSCustomAssetBundle
+    MaterialIndex: int
+    MeshIndex: int
+    ContainedObjects: list[TTSObject] | None = None
+
+
 
 TTSObject = Annotated[
     Union[
@@ -483,6 +491,7 @@ TTSObject = Annotated[
         TTSDeckCustomObject,
         TTSScriptingTriggerObject,
         TTSCounterObject,
+        TTSCustomAssetbundleBagObject,
     ],
     Field(discriminator='Name')
 ]
