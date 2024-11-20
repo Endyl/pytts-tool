@@ -490,6 +490,13 @@ class TTSCustomPDFObject(TTSObjectBaseHandable):
     MeasureMovement: bool = False
 
 
+class TTSInfiniteBagObject(TTSObjectBaseHandable):
+    Name: Literal['Infinite_Bag']
+    MaterialIndex: int
+    MeshIndex: int
+    ContainedObjects: list[TTSObject] | None = None
+
+
 
 TTSObject = Annotated[
     Union[
@@ -509,6 +516,7 @@ TTSObject = Annotated[
         TTSCounterObject,
         TTSCustomAssetbundleBagObject,
         TTSCustomPDFObject,
+        TTSInfiniteBagObject,
     ],
     Field(discriminator='Name')
 ]
