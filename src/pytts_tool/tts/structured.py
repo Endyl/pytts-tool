@@ -5,7 +5,7 @@ TODO:
 from __future__ import annotations
 
 from typing import Annotated, Literal, Optional, Union
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 # ==================================================================== Global #
 class TTSRGBColor(BaseModel):
@@ -211,10 +211,8 @@ class TTSDeck(BaseModel):
 class TTSText(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
-    Colorstate: TTSRGBColor | None = None
-    colorstate: TTSRGBColor | None = None
-    fontSize: int | float | None = None
-    fontsize: int | float | None = None
+    colorstate: TTSRGBColor | None = Field(default=None, validation_alias=AliasChoices('colorstate', 'Colorstate'))
+    fontsize: int | float | None = Field(default=None, alias='fontSize')
     Text: str
 
 
@@ -259,7 +257,7 @@ class TTSPhysicsMaterial(BaseModel):
 class TTSRigidBody(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
-    AngularGrag: float
+    AngularDrag: float | None = Field(default=None, validation_alias=AliasChoices('AngularDrag', 'AngularGrag'))
     Drag: float
     Mass: float
     UseGravity: bool
@@ -299,6 +297,12 @@ class TTSBag(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
     Order: int
+
+
+class TTSCounter(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    value: int
 
 
 # =================================================================== Objects #
@@ -349,7 +353,7 @@ class TTSCardObject(TTSObjectBaseHandable):
     LayoutGroupSortIndex: int | None = None
     MeasureMovement: bool = False
     PysicsMaterial: TTSPhysicsMaterial | None = None
-    RigidBody: TTSRigidBody | None = None
+    RigidBody: TTSRigidBody | None = Field(default=None, alias='Rigidbody')
     SidewaysCard: bool
     Value: int | None = None
     ContainedObjects: list[TTSCardObject] | None = None
@@ -382,7 +386,7 @@ class TTSCustomModelInfiniteBagObject(TTSObjectBaseHandable):
     MeasureMovement: bool = False
     MeshIndex: int
     PhysicsMaterial: TTSPhysicsMaterial | None = None
-    RigidBody: TTSRigidBody | None = None
+    RigidBody: TTSRigidBody | None = Field(default=None, alias='Rigidbody')
     Value: int | None = None
     ContainedObjects: list[TTSObject]
 
@@ -395,7 +399,7 @@ class TTSCustomTileObject(TTSObjectBaseHandable):
     LayoutGroupSortIndex: int | None = None
     MeasureMovement: bool = False
     PhysicsMaterial: TTSPhysicsMaterial | None = None
-    RigidBody: TTSRigidBody | None = None
+    RigidBody: TTSRigidBody | None = Field(default=None, alias='Rigidbody')
     RotationValues: list[TTSRotationValue] | None = None
     States: dict[int, TTSCustomTileObject] | None = None
     Value: int | None = None
@@ -437,7 +441,7 @@ class TTSCustomModelObject(TTSObjectBaseHandable):
     DragSelectable: bool = True
     MeasureMovement: bool = False
     PhysicsMaterial: TTSPhysicsMaterial | None = None
-    RigidBody: TTSRigidBody | None = None
+    RigidBody: TTSRigidBody | None = Field(default=None, alias='Rigidbody')
     States: dict[int, TTSCustomModelObject] | None = None
 
 
@@ -457,6 +461,11 @@ class TTSScriptingTriggerObject(TTSObjectBaseHandable):
     Name: Literal['ScriptingTrigger']
 
 
+class TTSCounterObject(TTSObjectBaseHandable):
+    Name: Literal['Counter']
+    Counter: TTSCounter | None = None
+
+
 
 TTSObject = Annotated[
     Union[
@@ -473,6 +482,7 @@ TTSObject = Annotated[
         TTSCustomModelObject,
         TTSDeckCustomObject,
         TTSScriptingTriggerObject,
+        TTSCounterObject,
     ],
     Field(discriminator='Name')
 ]
