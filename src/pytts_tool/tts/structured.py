@@ -7,8 +7,27 @@ from __future__ import annotations
 from typing import Annotated, Literal, Optional, Union
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
+# ===================================================================== Utils #
+def get_known_fields():
+    import inspect
+
+    result = set()
+
+    for name, value in globals().items():
+        if not (inspect.isclass(value) and issubclass(value, TTSBaseModel)):
+            continue
+        if not (name == 'TTSSave' or name.endswith('Object')):
+            continue
+
+        result |= set(value.model_fields.keys())
+
+    return sorted(list(result))
+
 # ==================================================================== Global #
-class TTSRGBColor(BaseModel):
+class TTSBaseModel(BaseModel):
+    pass
+
+class TTSRGBColor(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     r: float
@@ -20,7 +39,7 @@ class TTSRGBAColor(TTSRGBColor):
     a: float
 
 
-class TTSXYZColor(BaseModel):
+class TTSXYZColor(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     x: float
@@ -28,7 +47,7 @@ class TTSXYZColor(BaseModel):
     z: float
 
 
-class TTSCoordinate(BaseModel):
+class TTSCoordinate(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     x: float
@@ -36,7 +55,7 @@ class TTSCoordinate(BaseModel):
     z: float
 
 
-class TTSRotation(BaseModel):  # 0-360 ?
+class TTSRotation(TTSBaseModel):  # 0-360 ?
     model_config = ConfigDict(extra='forbid')
 
     x: float
@@ -44,7 +63,7 @@ class TTSRotation(BaseModel):  # 0-360 ?
     z: float
 
 
-class TTSTransform(BaseModel):
+class TTSTransform(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     posX: float
@@ -59,7 +78,7 @@ class TTSTransform(BaseModel):
 
 
 # ================================================================ Save Parts #
-class TTSGrid(BaseModel):
+class TTSGrid(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     BothSnapping: bool
@@ -75,7 +94,7 @@ class TTSGrid(BaseModel):
     ySize: float
 
 
-class TTSLighting(BaseModel):
+class TTSLighting(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     AmbientEquatorColor: TTSRGBColor
@@ -91,14 +110,14 @@ class TTSLighting(BaseModel):
     ReflectionIntensity: float
 
 
-class TTSHandTransform(BaseModel):
+class TTSHandTransform(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     Color: str  # colorstring?
     Transform: TTSTransform
 
 
-class TTSHands(BaseModel):
+class TTSHands(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     DisableUnused: bool
@@ -108,7 +127,7 @@ class TTSHands(BaseModel):
     HandTransforms: list[TTSHandTransform] | None = None
 
 
-class TTSTurns(BaseModel):
+class TTSTurns(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     DisableInteractions: bool
@@ -121,7 +140,7 @@ class TTSTurns(BaseModel):
     Type: int
 
 
-class TTSTabState(BaseModel):
+class TTSTabState(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     body: str
@@ -131,7 +150,7 @@ class TTSTabState(BaseModel):
     visibleColor: TTSRGBColor
 
 
-class TTSCameraState(BaseModel):
+class TTSCameraState(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     Distance: float
@@ -140,7 +159,7 @@ class TTSCameraState(BaseModel):
     Zoomed: bool
 
 
-class TTSDecal(BaseModel):
+class TTSDecal(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     ImageURL: str  # url
@@ -148,7 +167,7 @@ class TTSDecal(BaseModel):
     Size: float
 
 
-class TTSSnapPoint(BaseModel):
+class TTSSnapPoint(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     Position: TTSCoordinate
@@ -157,7 +176,7 @@ class TTSSnapPoint(BaseModel):
 
 
 # ============================================================== Object Parts #
-class TTSBaseCustomImage(BaseModel):
+class TTSBaseCustomImage(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     ImageURL: str  # url
@@ -166,7 +185,7 @@ class TTSBaseCustomImage(BaseModel):
     WidthScale: float
 
 
-class TTSCustomToken(BaseModel):
+class TTSCustomToken(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     Thickness: float
@@ -175,7 +194,7 @@ class TTSCustomToken(BaseModel):
     Stackable: bool
 
 
-class TTSCustomTile(BaseModel):
+class TTSCustomTile(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     Type: int
@@ -192,7 +211,7 @@ class TTSTileCustomImage(TTSBaseCustomImage):
     CustomTile: TTSCustomTile
 
 
-class TTSCustomDeck(BaseModel):
+class TTSCustomDeck(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     FaceURL: str  # URL
@@ -204,11 +223,11 @@ class TTSCustomDeck(BaseModel):
     Type: int | None = None
 
 
-class TTSDeck(BaseModel):
+class TTSDeck(TTSBaseModel):
     pass
 
 
-class TTSText(BaseModel):
+class TTSText(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     colorstate: TTSRGBColor | None = Field(default=None, validation_alias=AliasChoices('colorstate', 'Colorstate'))
@@ -216,7 +235,7 @@ class TTSText(BaseModel):
     Text: str
 
 
-class TTSJointHinge(BaseModel):
+class TTSJointHinge(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     Anchor: dict
@@ -234,7 +253,7 @@ class TTSJointHinge(BaseModel):
     UseSpring: bool
 
 
-class TTSCustomAssetBundle(BaseModel):
+class TTSCustomAssetBundle(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     AssetbundleURL: str  # URL
@@ -244,7 +263,7 @@ class TTSCustomAssetBundle(BaseModel):
     LoopingEffectIndex: int
 
 
-class TTSPhysicsMaterial(BaseModel):
+class TTSPhysicsMaterial(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     BounceCombine: int
@@ -254,7 +273,7 @@ class TTSPhysicsMaterial(BaseModel):
     StaticFriction: float
 
 
-class TTSRigidBody(BaseModel):
+class TTSRigidBody(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     AngularDrag: float | None = Field(default=None, validation_alias=AliasChoices('AngularDrag', 'AngularGrag'))
@@ -263,7 +282,7 @@ class TTSRigidBody(BaseModel):
     UseGravity: bool
 
 
-class TTSCustomMesh(BaseModel):
+class TTSCustomMesh(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     CastShadows: bool
@@ -277,7 +296,7 @@ class TTSCustomMesh(BaseModel):
     TypeIndex: int
 
 
-class TTSCustomShader(BaseModel):
+class TTSCustomShader(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     FresnelStrength: float
@@ -286,26 +305,26 @@ class TTSCustomShader(BaseModel):
     SpecularSharpness: float
 
 
-class TTSRotationValue(BaseModel):
+class TTSRotationValue(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     Value: str
     Rotation: TTSRotation
 
 
-class TTSBag(BaseModel):
+class TTSBag(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     Order: int
 
 
-class TTSCounter(BaseModel):
+class TTSCounter(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     value: int
 
 
-class TTSCustomPDF(BaseModel):
+class TTSCustomPDF(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     PDFPage: int
@@ -314,7 +333,7 @@ class TTSCustomPDF(BaseModel):
     PDFUrl: str  # URL
 
 
-class TTSMusicPlayer(BaseModel):
+class TTSMusicPlayer(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     RepeatSong: bool
@@ -324,21 +343,21 @@ class TTSMusicPlayer(BaseModel):
     AudioLibrary: list[str]
 
 
-class TTSComponentTag(BaseModel):
+class TTSComponentTag(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     displayed: str
     normalized: str
 
 
-class TTSComponentTags(BaseModel):
+class TTSComponentTags(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     labels: list[TTSComponentTag]
 
 
 # =================================================================== Objects #
-class TTSObjectBase(BaseModel):
+class TTSObjectBase(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     Description: str
@@ -549,7 +568,7 @@ TTSObject = Annotated[
 
 
 # ================================================================== SaveFile #
-class TTSSave(BaseModel):
+class TTSSave(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     CameraStates: list[None | TTSCameraState] | None = None
