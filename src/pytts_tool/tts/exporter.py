@@ -40,6 +40,8 @@ from typing import Generator, Any
 
 from .structured import SaveKeys, ObjectKeys, MiscKeys
 
+from tqdm import tqdm
+
 def is_string_field_empty(value: Any) -> bool:
     return not (value and str(value).strip())
 
@@ -112,6 +114,16 @@ class ExportVFS:
             print(f'Append to missing key: <{path}: {key}>')
             target[key] = []
         target[key].append(value)
+
+    def write_files(self):
+        pbar = tqdm(self.files.items())
+        for path, content in pbar:
+            pbar.set_description(f'Exporting file: {path}')
+
+        pbar = tqdm(self.lib.items())
+        for path, content in pbar:
+            pbar.set_description(f'Exporting lib: {path}')
+
 
 
 class TTSSaveExporter:

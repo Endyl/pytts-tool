@@ -101,10 +101,7 @@ def pytts_extract_2():
         vfs = ExportVFS(Path('out'), Path('out'))
         exporter = TTSSaveExporter(save.model_dump(exclude_unset=True), vfs)
         exporter.export_as_project()
-        for key, value in exporter.vfs.files.items():
-            print(f'File {key}: {value}')
-        for key, value in exporter.vfs.lib.items():
-            print(f'Lib {key}')
+        vfs.write_files()
 
     except ValidationError as ex:
         print('Save validation error:')
