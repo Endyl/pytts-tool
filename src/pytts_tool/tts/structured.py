@@ -3,8 +3,9 @@ TODO:
 - color strings
 """
 from __future__ import annotations
-
+from enum import StrEnum
 from typing import Annotated, Literal, Optional, Union
+
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 # ===================================================================== Utils #
@@ -24,6 +25,108 @@ def get_known_fields():
     return sorted(list(result))
 
 # ==================================================================== Global #
+class SaveKeys(StrEnum):
+    SAVE_NAME = 'SaveName'
+    EPOCH_TIME = 'EpochTime'
+    DATE = 'Date'
+    VERSION_NUMBER = 'VersionNumber'
+    GAME_MODE = 'GameMode'
+    GAME_TYPE = 'GameType'
+    GAME_COMPLEXITY = 'GameComplexity'
+    PLAYING_TIME = 'PlayingTime'
+    PLAYER_COUNTS = 'PlayerCounts'
+    TAGS = 'Tags'
+    GRAVITY = 'Gravity'
+    PLAY_AREA = 'PlayArea'
+    TABLE = 'Table'
+    SKY = 'Sky'
+    SKY_URL = 'SkyURL'
+    NOTE = 'Note'
+    GRID = 'Grid'
+    COMPONENT_TAGS = 'ComponentTags'
+    TURNS = 'Turns'
+    DECAL_PALLET = 'DecalPallet'
+    TABLE_URL = 'TableURL'
+    RULES = 'Rules'
+    TAB_STATES = 'TabStates'
+    CAMERA_STATES = 'CameraStates'
+    SNAP_POINTS = 'SnapPoints'
+    LUA_SCRIPT_STATE = 'LuaScriptState'
+    OBJECT_STATES = 'ObjectStates'
+    HANDS = 'Hands'
+    LIGHTING = 'Lighting'
+    MUSIC_PLAYER = 'MusicPlayer'
+    TAG_STATES = 'TagStates'
+    LUA_SCRIPT = 'LuaScript'
+    XML_UI = 'XmlUI'
+
+class ObjectKeys(StrEnum):
+    ATTACHED_SNAP_POINTS = 'AttachedSnapPoints'
+    AUTORAISE = 'Autoraise'
+    COLOR_DIFFUSE = 'ColorDiffuse'
+    CUSTOM_ASSETBUNDLE = 'CustomAssetbundle'
+    CUSTOM_DECK = 'CustomDeck'
+    CUSTOM_IMAGE = 'CustomImage'
+    CUSTOM_MESH = 'CustomMesh'
+    DECK_IDS = 'DeckIDs'
+    DESCRIPTION = 'Description'
+    GM_NOTES = 'GMNotes'
+    GRID_PROJECTION = 'GridProjection'
+    GUID = 'GUID'
+    HIDDEN_WHEN_FACE_DOWN = 'HiddenWhenFaceDown'
+    IGNORE_FOW = 'IgnoreFoW'
+    LOCKED = 'Locked'
+    MATERIAL_INDEX = 'MaterialIndex'
+    MESH_INDEX = 'MeshIndex'
+    NAME = 'Name'
+    NICKNAME = 'Nickname'
+    NUMBER = 'Number'
+    SIDEWAYS_CARD = 'SidewaysCard'
+    SNAP = 'Snap'
+    STATES = 'States'
+    STICKY = 'Sticky'
+    TOOLTIP = 'Tooltip'
+    TRANSFORM = 'Transform'
+    CARD_ID = 'CardID'
+    BAG = 'Bag'
+    COUNTER = 'Counter'
+    CUSTOM_PDF = 'CustomPDF'
+    DRAG_SELECTABLE = 'DragSelectable'
+    HIDE_WHEN_FACE_DOWN = 'HideWhenFaceDown'
+    JOINT_HINGE = 'JointHinge'
+    LAYOUT_GROUP_SORT_INDEX = 'LayoutGroupSortIndex'
+    MEASURE_MOVEMENT = 'MeasureMovement'
+    PHYSICS_MATERIAL = 'PhysicsMaterial'
+    RIGID_BODY = 'Rigidbody'
+    TEXT = 'Text'
+    VALUE = 'Value'
+    CONTAINED_OBJECTS = 'ContainedObjects'
+    ROTATION_VALUES = 'RotationValues'
+    GRID = 'Grid'
+    HANDS = 'Hands'
+    LUA_SCRIPT = 'LuaScript'
+    LUA_SCRIPT_STATE = 'LuaScriptState'
+    XML_UI = 'XmlUI'
+
+class MiscKeys(StrEnum):# Decal
+    IMAGE_URL = 'ImageURL'
+    # CustomDeck
+    FACE_URL = 'FaceURL'
+    BACK_URL = 'BackURL'
+    # CustomAssetbundle
+    ASSETBUNDLE_URL = 'AssetbundleURL'
+    ASSETBUNDLE_SECONDARY_URL = 'AssetbundleSecondaryURL'
+    # CustomImage
+    IMAGE_SECONDARY_URL = 'ImageSecondaryURL'
+    # CustomMesh
+    MESH_URL = 'MeshURL'
+    DIFFUSE_URL = 'DiffuseURL'
+    NORMAL_URL = 'NormalURL'
+    COLLIDER_URL = 'ColliderURL'
+    # CustomPDF
+    PDF_URL = 'PDFUrl'
+
+
 class TTSBaseModel(BaseModel):
     pass
 

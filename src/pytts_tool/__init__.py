@@ -85,7 +85,9 @@ def pytts_gentypes():
 
 @pytts_tool.command('extract2')
 def pytts_extract_2():
+    from pathlib import Path
     from .tts.structured import TTSSave, get_known_fields
+    from .tts.exporter import TTSSaveExporter, ExportVFS
     TEST_FILES = {
         'TFMARS': '000-data/testing/TFMARS_vVERSION.json',
         'SZUV': '000-data/Saves/szuv.json',
@@ -95,8 +97,16 @@ def pytts_extract_2():
 
     try:
         save = TTSSave.model_validate(data)
+
+        vfs = ExportVFS(Path('out'), Path('out'))
+        exporter = TTSSaveExporter(save.model_dump(exclude_unset=True), vfs)
+        exporter.export_as_project()
+        for key, value in exporter.vfs.files.items():
+            print(f'File {key}: {value}')
+        for key, value in exporter.vfs.lib.items():
+            print(f'Lib {key}')
+
     except ValidationError as ex:
         print('Save validation error:')
         print(ex)
-
 
