@@ -2,7 +2,7 @@
 Project Structure
 
 build/
-imports/
+imports/  # to store savegame.json?
 src/
     lib/
     lib-absolute/
@@ -33,6 +33,7 @@ src/
         main.xml
         state.[json|txt]
 """
+import json
 import os.path
 from pathlib import Path
 import re
@@ -65,6 +66,10 @@ def lookahead(iterable, flag_for_last=True) -> Generator[tuple[bool, Any], Any, 
 
     # end of loop, yield last value
     yield flag_for_last, result
+
+
+class ResourceRequest:
+    pass
 
 
 class ExportVFS:
@@ -115,14 +120,39 @@ class ExportVFS:
             target[key] = []
         target[key].append(value)
 
+    def write_resource(self, path: Path, content: ResourceRequest):
+        # if exists skip (force download?)
+        print(f'Writing ResourceRequest not implemented: {path}')
+
+    def write_contents(self, path: Path, content):
+        with open(path, 'w') as f:
+            if '.json' == path.suffix or not isinstance(content, str):
+                json.dump(content, f, ensure_ascii=False, indent='\t')
+            elif not isinstance(content, str):
+                print(f'Writing non string to non json <{path}> {type(content)}')
+                f.write(str(content))
+            else:
+                f.write(content)
+
+    def write_file(self, path: Path, content):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(content, ResourceRequest):
+            self.write_resource(path, content)
+        else:
+            self.write_contents(path, content)
+
     def write_files(self):
         pbar = tqdm(self.files.items())
         for path, content in pbar:
-            pbar.set_description(f'Exporting file: {path}')
+            cpath = self.fs_root / path
+            pbar.set_description(f'Exporting file: {cpath}')
+            self.write_file(cpath, content)
 
         pbar = tqdm(self.lib.items())
         for path, content in pbar:
-            pbar.set_description(f'Exporting lib: {path}')
+            cpath = self.lib_root / path
+            pbar.set_description(f'Exporting lib: {cpath}')
+            self.write_file(cpath, content)
 
 
 
@@ -344,15 +374,17 @@ class LuaScriptExtractor:
         return include_type, path, wrapped
 
     def get_include_path(self, include_type, path):
+        #print(f'Check include type: {include_type} / {self.key} / {path}')
         if 'absolute' == include_type:
-            return path
+            return Path('lib-absolute') / path[1:]
         elif 'fixed' == include_type:
-            return path[2:]
+            return Path('lib') / path[2:]
         elif 'home' == include_type:
-            return path
+            return Path('lib-home') / path[2:]
         elif 'relative' == include_type:
-            if 'main.ttslua' == self.key:
-                return path
+            if 'main.ttslua' == self.key.name:
+                # including from object LuaScript
+                return Path('lib') / path
             else:
                 return os.path.normpath(Path(self.key).parent / path)
         else:
