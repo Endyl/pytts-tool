@@ -107,3 +107,12 @@ def pytts_extract_2():
         print('Save validation error:')
         print(ex)
 
+
+@pytts_tool.command('build')
+def pytts_build():
+    from pathlib import Path
+    from .tts.builder import TTSSaveBuilder
+    builder = TTSSaveBuilder(Path('out'))
+    data = builder.build_save()
+    with open('000-data/build/szuv.json', 'w') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
