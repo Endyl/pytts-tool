@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 import os.path
 
 import click
@@ -6,6 +7,9 @@ from pydantic import ValidationError
 import tomli
 
 from .tts.data import TTSSave
+
+def param_to_path(ctx, param, value) -> Path:
+    return Path(value)
 
 def read_conf(config_path):
     with open(config_path, 'rb') as f:
@@ -27,11 +31,51 @@ def pytts_tool():
     pass
 
 @pytts_tool.command('extract')
+@click.option('-s', '--save', 'savefile_path',
+    type=click.Path(exists=True),
+    required=True,
+    prompt='Save file',
+    default='imports/save.json',
+    callback=param_to_path)
+@click.option('-e', '--export', 'fs_root',
+    type=click.Path(exists=True),
+    required=True,
+    prompt='Export root',
+    default='.',
+    callback=param_to_path)
+@click.option('-l', '--lib', 'lib_root',
+    type=click.Path(exists=True),
+    required=True,
+    prompt='Lib root',
+    default='src',
+    callback=param_to_path)
+def pytts_extract(savefile_path: Path, fs_root: Path, lib_root: Path):
+    from .tts.structured import TTSSave, get_known_fields
+    from .tts.exporter import TTSSaveExporter, ExportVFS
+
+    with open(savefile_path, 'r') as f:
+        data = json.load(f)
+
+    try:
+        save = TTSSave.model_validate(data)
+
+        vfs = ExportVFS(fs_root, lib_root)
+        exporter = TTSSaveExporter(save.model_dump(exclude_unset=True), vfs)
+        exporter.export_as_project()
+        vfs.write_files()
+
+    except ValidationError as ex:
+        print('Save validation error:')
+        print(ex)
+
+
+# ============================================================= Tmp / Testing #
+@pytts_tool.command('extract-old')
 @click.option('-s', '--save', default=None)
 @click.option('-o', '--output', default=None)
 @click.option('-c', '--config', default='pytts.toml')
 @click.option('-b', '--backup', 'do_backup', is_flag=True, default=False)
-def pytts_extract(save, output, config, do_backup):
+def pytts_extract_old(save, output, config, do_backup):
     conf = read_conf(config)
     conf_save = format_path(conf, conf.get('EXTRACT_SAVE', ''))
     conf_out = format_path(conf, conf.get('EXTRACT_OUT', ''))
