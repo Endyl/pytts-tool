@@ -33,18 +33,81 @@ src/
         main.xml
         state.[json|txt]
 """
+from __future__ import annotations
+
 import json
+import logging
+import mimetypes
 import os.path
 from pathlib import Path
 import re
+import time
 from typing import Generator, Any
+from urllib.parse import urlparse, quote as urlquote
+from collections import defaultdict
 
 from .structured import SaveKeys, ObjectKeys, MiscKeys
 
+import requests
 from tqdm import tqdm
+
+logger = logging.getLogger('pytts_tool')
 
 def is_string_field_empty(value: Any) -> bool:
     return not (value and str(value).strip())
+
+def pathify_url(value: str):
+    return urlquote(value, safe='').replace('~', '%7E')
+
+def pathify_url_tts(value: str):
+    chars = (':', '/', '.', '-')
+    for ch in chars:
+        value = value.replace(ch, '')
+    return value
+
+def is_url(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        result = urlparse(value.strip())
+        if all([result.scheme, result.netloc]):
+            return True
+        else:
+            if value.startswith('http'):
+                print('what?', value)
+            return False
+    except ValueError:
+        return False
+
+
+def export_urls(vfs: ExportVFS, guid: str, path: Path, key: str, value: Any):
+    if is_url(value):
+        vfs.add_resource(guid, path, key, value)
+    elif isinstance(value, dict):
+        for vkey, vvalue in value.items():
+            export_urls(vfs, guid, path, f'{key}.{vkey}', vvalue)
+    elif isinstance(value, list):
+        for index, vvalue in enumerate(value):
+            export_urls(vfs, guid, path, f'{key}.{index}', vvalue)
+
+def guess_ext(url, fix_ext, guess='.unk.bin'):
+    if fix_ext:
+        return fix_ext
+
+    mtype, encoding = mimetypes.guess_type(url)
+    if mtype is None:
+        ct_headers = ('content-type', 'contenttype')
+        res = requests.head(url)
+        mtype = ''
+        for hname, hvalue in res.headers.items():
+            lhname = str(hname).lower().strip()
+            if lhname in ct_headers:
+                mtype = hvalue
+
+    ext = mimetypes.guess_extension(mtype)
+    return ext if ext is not None else guess
+
+
 
 def lookahead(iterable, flag_for_last=True) -> Generator[tuple[bool, Any], Any, Any]:
     flag_all = not flag_for_last
@@ -69,7 +132,91 @@ def lookahead(iterable, flag_for_last=True) -> Generator[tuple[bool, Any], Any, 
 
 
 class ResourceRequest:
-    pass
+    EXT_MAP = {
+        SaveKeys.SKY_URL.value: '.img.bin',
+        SaveKeys.TABLE_URL.value: '.img.bin',
+        MiscKeys.ASSETBUNDLE_URL.value: '.bin',
+        MiscKeys.ASSETBUNDLE_SECONDARY_URL.value: '.bin',
+        MiscKeys.MESH_URL.value: '.bin',
+        MiscKeys.PDF_URL.value: '.pdf',
+        MiscKeys.IMAGE_URL.value: '.img.bin',
+        MiscKeys.IMAGE_SECONDARY_URL.value: '.img.bin',
+        MiscKeys.DIFFUSE_URL.value: '.img.bin',
+        MiscKeys.NORMAL_URL.value: '.bin',
+        MiscKeys.COLLIDER_URL.value: '.bin',
+        MiscKeys.FACE_URL.value: '.img.bin',
+        MiscKeys.BACK_URL.value: '.img.bin',
+    }
+
+    def __init__(self, url: str, path: Path, item_path: Path, item_key: str, cache_entries: list[str]):
+        self.url = url
+        self.path = path
+        self.item_path = item_path
+        self.item_key = item_key
+        self.cache_entries = cache_entries
+
+    def get_ext_guess(self):
+        key = self.item_key.split('.')[-1]
+        return self.EXT_MAP.get(key, '.unk.bin')
+
+    def get_from_cache(self) -> None | Path:
+        if not self.cache_entries:
+            return None
+
+
+    def download(self, url, path):
+        chunk_encoded = False # Change to True if chunk encoded???
+        chunk_size = None if chunk_encoded else 8192
+        time.sleep(0.5)
+        with requests.get(url, stream=True) as r:
+            if r.status_code == 200:
+                with open(path, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=chunk_size):
+                        if (chunk_encoded and chunk) or not chunk_encoded:
+                            f.write(chunk)
+                logger.debug(f'Downloaded <{url}> to <{path}>')
+                return True
+            else:
+                logger.debug(f'Failed to download <{url}> to <{path}>')
+                #r.raise_for_status()
+                return False
+
+    def do_download(self, url):
+        ext_guess = self.get_ext_guess()
+        ext = guess_ext(url, None, ext_guess)
+        ext_path = self.path.with_suffix(f'{self.path.suffix}{ext}')
+        if ext_path.exists():
+            logger.debug(f'Asset already exists: {ext_path}')
+            return ext_path
+
+        if self.download(url, ext_path):
+            return ext_path
+
+        return None
+
+    def write_file(self):
+        ext_path = self.get_from_cache()
+        if ext_path:
+            return ext_path
+
+        ext_path = self.do_download(self.url)
+        if ext_path:
+            return ext_path
+
+        akamai_url = urlparse(self.url)
+        if not akamai_url.netloc.endswith('.steamusercontent.com'):
+            return None
+
+        akamai_url = akamai_url._replace(
+            scheme='https',
+            netloc='steamusercontent-a.akamaihd.net',
+        )
+        logger.debug(f'Trying: {akamai_url.geturl()}')
+        ext_path = self.do_download(akamai_url.geturl())
+        if ext_path:
+            return ext_path
+
+        return None
 
 
 class ExportVFS:
@@ -77,59 +224,67 @@ class ExportVFS:
         self.fs_root = fs_root
         self.lib_root = lib_root
 
+        with open('/media/slemmer/HDD002-4TB/000-storage/project/me/pytts-tool/000-data/cachereg.json') as f:
+            self.cache_reg = json.load(f)
+
         self.files = {}
         self.lib = {}
+        self.resources = defaultdict(list)
 
     def add_lib_file(self, path: Path, content: str):
         if path in self.lib and (content != self.lib[path]):
-            print(f'Mismatched content: {path}')
+            logger.debug(f'Mismatched content: {path}')
             return
         self.lib[path] = content
 
     def add_file(self, path: Path, content: str | list | dict):
         if path in self.files:
-            print(f'Path already exists: <{path}>')
+            logger.debug(f'Path already exists: <{path}>')
         else:
             self.files[path] = content
 
     def add_to_file(self, path: Path, *keys: list[str], value):
         if path not in self.files:
-            print(f'Trying to add to missing file: <{path}>: <{keys}>')
+            logger.debug(f'Trying to add to missing file: <{path}>: <{keys}>')
             self.add_file(path, {})
 
         target = self.files[path]
         for is_last, key in lookahead(keys):
             if is_last:
                 if key in target:
-                    print(f'Multiple assignment: <{path}: {keys}>')
+                    logger.debug(f'Multiple assignment: <{path}: {keys}>')
                 target[key] = value
             else:
                 if key not in target:
-                    print(f'Creating target path: <{path}: {key} / {keys}>')
+                    logger.debug(f'Creating target path: <{path}: {key} / {keys}>')
                     target[key] = {}
                 target = target[key]
 
     def append_to(self, path: Path, key: str, value):
         if path not in self.files:
-            print(f'Trying to append to missing file: <{path}>: <{key}>')
+            logger.debug(f'Trying to append to missing file: <{path}>: <{key}>')
             self.add_file(path, {})
 
         target = self.files[path]
         if key not in target:
-            print(f'Append to missing key: <{path}: {key}>')
+            logger.debug(f'Append to missing key: <{path}: {key}>')
             target[key] = []
         target[key].append(value)
 
+    def add_resource(self, guid: str, path: Path, key: str, value):
+        self.resources[value].append([path, guid, key])
+
     def write_resource(self, path: Path, content: ResourceRequest):
         # if exists skip (force download?)
-        print(f'Writing ResourceRequest not implemented: {path}')
+        #logger.debug(f'Writing ResourceRequest not implemented: {path}')
+        return content.write_file()
 
     def write_contents(self, path: Path, content):
         with open(path, 'w') as f:
             if '.json' == path.suffix or not isinstance(content, str):
                 json.dump(content, f, ensure_ascii=False, indent='\t')
             elif not isinstance(content, str):
-                print(f'Writing non string to non json <{path}> {type(content)}')
+                logger.debug(f'Writing non string to non json <{path}> {type(content)}')
                 f.write(str(content))
             else:
                 f.write(content)
@@ -137,9 +292,10 @@ class ExportVFS:
     def write_file(self, path: Path, content):
         path.parent.mkdir(parents=True, exist_ok=True)
         if isinstance(content, ResourceRequest):
-            self.write_resource(path, content)
+            return self.write_resource(path, content)
         else:
             self.write_contents(path, content)
+            return path
 
     def write_files(self):
         pbar = tqdm(self.files.items())
@@ -153,6 +309,27 @@ class ExportVFS:
             cpath = self.lib_root / path
             pbar.set_description(f'Exporting lib: {cpath}')
             self.write_file(cpath, content)
+
+        guid_map = defaultdict(list)
+        pbar = tqdm(self.resources.items())
+        for url, referers in pbar:
+            pbar.set_description(f'Processing:  {url}')
+            url_path = pathify_url(url)
+            for r in referers:
+                guid_map[url_path].append(
+                    [str(r[0]), r[2]]
+                )
+            resource_path = self.fs_root / 'src' / 'save' / 'assets' / url_path
+            logger.debug(f'Resource: {resource_path}')
+            ext_path = self.write_file(resource_path, ResourceRequest(
+                url,
+                resource_path,
+                r[0],
+                r[2],
+                self.cache_reg.get(pathify_url_tts(url), None)
+            ))
+        self.write_file(self.fs_root / 'src' / 'save' / 'guid-map.json', dict(guid_map))
+
 
 
 
@@ -187,6 +364,7 @@ class TTSSaveExporter:
         exporter(path, key, value)
 
     def export_raw(self, path: Path, key, value):
+        export_urls(self.vfs, 'root', path, key, value)
         if key in self.EXTERNAL:
             self.vfs.add_file(path.parent / 'fields' / f'{key}.json', value)
         else:
@@ -264,6 +442,7 @@ class TTSSaveObjectExporter:
         exporter(path, key, value)
 
     def export_raw(self, path: Path, key, value):
+        export_urls(self.vfs, self.data.get('GUID', 'unknown'), path, key, value)
         if key in self.EXTERNAL:
             self.vfs.add_file(path.parent / 'fields' / f'{key}.json', value)
         else:
@@ -374,7 +553,7 @@ class LuaScriptExtractor:
         return include_type, path, wrapped
 
     def get_include_path(self, include_type, path):
-        #print(f'Check include type: {include_type} / {self.key} / {path}')
+        #logger.debug(f'Check include type: {include_type} / {self.key} / {path}')
         if 'absolute' == include_type:
             return Path('lib-absolute') / path[1:]
         elif 'fixed' == include_type:
@@ -388,7 +567,7 @@ class LuaScriptExtractor:
             else:
                 return os.path.normpath(Path(self.key).parent / path)
         else:
-            print(f'Unknown include type: {include_type} [{path}]')
+            logger.debug(f'Unknown include type: {include_type} [{path}]')
 
     def process_line(self, contents, line):
         line_match = self.RE_INCLUDE.match(line)
@@ -433,4 +612,4 @@ class LuaScriptExtractor:
         elif 'lib' == self.file_type:
             self.files.add_lib_file(Path(f'{self.key}.ttslua'), '\n'.join(contents))
         else:
-            print(f'Unknown file type [{self.file_type}]: {self.key}')
+            logger.debug(f'Unknown file type [{self.file_type}]: {self.key}')

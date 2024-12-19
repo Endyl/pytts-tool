@@ -1,12 +1,76 @@
+import datetime as dt
 import json
+import logging
 from pathlib import Path
 import os.path
 
 import click
+from epylogging import BaseSQLiteHandler, LogField
 from pydantic import ValidationError
 import tomli
 
 from .tts.data import TTSSave
+
+logger = logging.getLogger('pytts_tool')
+
+class AllFieldsSQLiteHandler(BaseSQLiteHandler):
+    def __init__(self, *args, db_uri: str, **kwargs):
+        log_fields = [
+            self.LF_CREATED,
+            self.LF_MSECS,
+            self.LF_LEVEL,
+            self.LF_LEVEL_NAME,
+            self.LF_NAME,
+            LogField('user', 'INTEGER', 'user'),
+            self.LF_MESSAGE,
+            self.LF_EXC_INFO_TEXT,
+            self.LF_STACK_INFO,
+            self.LF_PATH_NAME,
+            self.LF_FILE_NAME,
+            self.LF_MODULE,
+            self.LF_FUNC_NAME,
+            self.LF_LINE,
+            self.LF_PROCESS,
+            self.LF_PROCESS_NAME,
+            self.LF_THREAD,
+            self.LF_THREAD_NAME,
+            self.LF_TASK_NAME,
+
+            #self.LF_ARGS,
+            #self.LF_ASCTIME,
+            #self.LF_EXC_INFO,
+            #self.LF_MSG,
+            #self.LF_RELATIVE_CREATED,
+        ]
+        super().__init__(*args, db_uri=db_uri, log_fields=log_fields, **kwargs)
+
+
+    def create_log_index(self, conn):
+        with conn:
+            indexes = (
+                ('logtime', '(created)'),
+                ('logtimeprec', '(created, msecs)'),
+                ('loglevelnum', '(level)'),
+                ('loglevelname', '(level_name)'),
+                ('logname', '(name)'),
+            )
+            for i in indexes:
+                conn.execute(
+                    f'CREATE INDEX IF NOT EXISTS {i[0]} ON "log" {i[1]}'
+                )
+
+
+    def format_time(self, v):
+        return dt.datetime.fromtimestamp(
+            v, tz=dt.timezone.utc
+        ).isoformat()
+
+
+    def format_exc_info(self, v):
+        if v:
+            return logging._defaultFormatter.formatException(v)  # type: ignore
+        else:
+            return None
 
 def param_to_path(ctx, param, value) -> Path:
     return Path(value)
@@ -25,10 +89,78 @@ def extract_save(path_to_save, path_to_project, do_backup=False):
     tts_save = TTSSave.from_save(path_to_save, do_backup=do_backup)
     tts_save.export_as_project(path_to_project, os.path.join(path_to_project, 'lib'))
 
+def setup_logging():
+    from epylogging import dictConfig
+    CONF = {
+        "version": 1,
+        "disable_existing_loggers": False,
 
-@click.group('pytts_tool')
-def pytts_tool():
-    pass
+        "formatters": {
+            "basic": {
+                "format": f"[%(asctime)s] [%(levelname)s|%(module)s|L%(lineno)d]: %(message)s\n{80*'='}",
+                "datefmt": "%Y-%m-%dT%H:%M:%S%z",
+            },
+            "jsonl": {
+                "()": "epylogging.JSONLineFormatter",
+                "fmt_keys": {
+                    "level": "levelname",
+                    "message": "message",
+                    "timestamp": "timestamp",
+                    "logger": "name",
+                    "module": "module",
+                    "function": "funcName",
+                    "line": "lineno",
+                    "thread_name": "threadName",
+                },
+            },
+        },
+
+        "handlers": {
+            "basic_file": {
+                "class": "logging.handlers.TimedRotatingFileHandler",
+                "when": "midnight",
+                "backupCount": 5,
+                "filename": "/media/slemmer/HDD002-4TB/000-storage/project/me/pytts-tool/logs/pytts-tool-logs.txt",
+                "formatter": "basic",
+            },
+            "json_file": {
+                "class": "logging.handlers.TimedRotatingFileHandler",
+                "when": "midnight",
+                "backupCount": 5,
+                "filename": "/media/slemmer/HDD002-4TB/000-storage/project/me/pytts-tool/logs/pytts-tool-logs.jsonl",
+                "formatter": "jsonl",
+            },
+            "sqlite": {
+                "()": "pytts_tool.AllFieldsSQLiteHandler",
+                "db_uri": "file:/media/slemmer/HDD002-4TB/000-storage/project/me/pytts-tool/logs/pytts-tool-logs.sqlite",
+            },
+            "queue_handler": {
+                "class": "epylogging.PreservingQueueHandler",
+                "respect_handler_level": True,
+                "handlers": [
+                    "basic_file",
+                    "json_file",
+                    "sqlite",
+                ],
+            },
+        },
+
+        "loggers": {
+            "root": {
+                "level": "DEBUG",
+                "handlers": ["queue_handler"],
+            },
+        },
+    }
+    dictConfig(CONF)
+
+
+
+@click.group('pytts_tool', invoke_without_command=True)
+@click.pass_context
+def pytts_tool(ctx):
+    setup_logging()
+    logger.debug('pytts-tool started')
 
 @pytts_tool.command('extract')
 @click.option('-s', '--save', 'savefile_path',
