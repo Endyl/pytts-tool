@@ -297,6 +297,9 @@ class ExportVFS:
             self.write_contents(path, content)
             return path
 
+    def write_assets(self):
+        pass
+
     def write_files(self):
         pbar = tqdm(self.files.items())
         for path, content in pbar:

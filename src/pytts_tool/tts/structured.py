@@ -256,6 +256,7 @@ class TTSTabState(TTSBaseModel):
 class TTSCameraState(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
+    AbsolutePosition: TTSCoordinate | None = None
     Distance: float
     Position: TTSCoordinate
     Rotation: TTSRotation
@@ -274,8 +275,17 @@ class TTSSnapPoint(TTSBaseModel):
     model_config = ConfigDict(extra='forbid')
 
     Position: TTSCoordinate
-    Rotation: TTSRotation
+    Rotation: TTSRotation | None = None
     Tags: Optional[list[str]] = Field(default_factory=list)
+
+class TTSVectorLine(TTSBaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    points3: list[TTSCoordinate]
+    color: TTSRGBColor
+    thickness: float
+    loop: bool | None = None
+    rotation: TTSRotation | None = None
 
 
 # ============================================================== Object Parts #
@@ -474,6 +484,8 @@ class TTSObjectBase(TTSBaseModel):
     AttachedSnapPoints: list[TTSSnapPoint] | None = None
     ColorDiffuse: TTSRGBColor | TTSRGBAColor | TTSXYZColor
     Transform: TTSTransform
+    AltLookAngle: TTSRotation | None = None
+    AttachedVectorLines: list[TTSVectorLine] | None = None
 
     Autoraise: bool
     DragSelectable: bool = True
@@ -509,7 +521,7 @@ class TTSCardObject(TTSObjectBase):
     PhysicsMaterial: TTSPhysicsMaterial | None = None
     RigidBody: TTSRigidBody | None = Field(default=None, validation_alias=AliasChoices('RigidBody', 'Rigidbody'))
     SidewaysCard: bool
-    ContainedObjects: list[TTSCardObject] | None = None
+    ContainedObjects: list[TTSCardObject | TTSCardCustomObject] | None = None
 
 
 class TTSDeckObject(TTSObjectBase):
@@ -517,13 +529,15 @@ class TTSDeckObject(TTSObjectBase):
     CustomDeck: dict[int, TTSCustomDeck]
     DeckIDs: list[int]
     SidewaysCard: bool
-    ContainedObjects: list[TTSCardObject]
+    ContainedObjects: list[TTSCardObject | TTSCardCustomObject]
 
 
 class TTSCustomAssetBundleObject(TTSObjectBase):
     Name: Literal['Custom_Assetbundle']
     CustomAssetbundle: TTSCustomAssetBundle
     JointHinge: TTSJointHinge | None = None
+    PhysicsMaterial: TTSPhysicsMaterial | None = None
+    RigidBody: TTSRigidBody | None = Field(default=None, alias='Rigidbody')
 
 
 class TTSCustomModelInfiniteBagObject(TTSObjectBase):
@@ -534,6 +548,7 @@ class TTSCustomModelInfiniteBagObject(TTSObjectBase):
     PhysicsMaterial: TTSPhysicsMaterial | None = None
     RigidBody: TTSRigidBody | None = Field(default=None, alias='Rigidbody')
     ContainedObjects: list[TTSObject]
+    ChildObjects: list[TTSObject] | None = None  # Attached objects?
 
 
 class TTSCustomTileObject(TTSObjectBase):
@@ -580,7 +595,7 @@ class TTSDeckCustomObject(TTSObjectBase):
     CustomDeck: dict[int, TTSCustomDeck]
     DeckIDs: list[int]
     SidewaysCard: bool
-    ContainedObjects: list[TTSCardObject]
+    ContainedObjects: list[TTSCardObject | TTSCardCustomObject]
 
 
 class TTSScriptingTriggerObject(TTSObjectBase):
@@ -598,6 +613,8 @@ class TTSCustomAssetbundleBagObject(TTSObjectBase):
     MaterialIndex: int
     MeshIndex: int
     ContainedObjects: list[TTSObject] | None = None
+    Number: int
+    Bag: TTSBag
 
 
 class TTSCustomPDFObject(TTSObjectBase):
@@ -622,6 +639,9 @@ class TTSCardCustomObject(TTSObjectBase):
 class TTSGoGamePieceBlackObject(TTSObjectBase):
     Name: Literal['go_game_piece_black']
 
+class TTSGoGamePieceWhiteObject(TTSObjectBase):
+    Name: Literal['go_game_piece_white']
+
 
 class TTSPlayerPawnObject(TTSObjectBase):
     Name: Literal['PlayerPawn']
@@ -639,6 +659,24 @@ class TTSBagObject(TTSObjectBase):
     MaterialIndex: int
     MeshIndex: int
     ContainedObjects: list[TTSObject] | None = None
+
+class TTSCustomBoardObject(TTSObjectBase):
+    Name: Literal['Custom_Board']
+    CustomImage: TTSBaseCustomImage
+
+class TTSChessBoardObject(TTSObjectBase):
+    Name: Literal['Chess_Board']
+
+class TTSNoteCardObject(TTSObjectBase):
+    Name: Literal['Notecard']
+
+class TTSFogOfWarTriggerObject(TTSObjectBase):
+    Name: Literal['FogOfWarTrigger']
+
+    FogColor: str  # color
+    FogHidePointers: bool
+    FogReverseHiding: bool
+    FogSeethrough: bool
 
 
 TTSObject = Annotated[
@@ -662,9 +700,14 @@ TTSObject = Annotated[
         TTSInfiniteBagObject,
         TTSCardCustomObject,
         TTSGoGamePieceBlackObject,
+        TTSGoGamePieceWhiteObject,
         TTSPlayerPawnObject,
         TTSHandTriggerObject,
         TTSBagObject,
+        TTSCustomBoardObject,
+        TTSChessBoardObject,
+        TTSNoteCardObject,
+        TTSFogOfWarTriggerObject,
     ],
     Field(discriminator='Name')
 ]
@@ -696,7 +739,7 @@ class TTSSave(TTSBaseModel):
     Rules: str | None = None
     SaveName: str
     Sky: str
-    SkyURL: str  # url
+    SkyURL: str | None = None  # url
     SnapPoints: list[TTSSnapPoint] | None = None
     TabStates: dict[str, TTSTabState]
     Table: str
